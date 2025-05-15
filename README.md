@@ -1,2 +1,2 @@
 # LAPTRINHMOBILE
-LẬP TRÌNH THIẾT BỊ DI ĐỘNG
+TheHub Platform number 1 of Asia
