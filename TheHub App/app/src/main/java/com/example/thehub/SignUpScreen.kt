@@ -24,20 +24,22 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 @Composable
 fun SignUpScreen(navController: NavController) {
-    // Chỉ giữ lại 3 state cho 3 trường nhập liệu
-    var email by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    // var email by remember { mutableStateOf("") } // Bỏ state email
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val auth: FirebaseAuth = Firebase.auth
+    val db = Firebase.firestore
 
     Column(
         modifier = Modifier
@@ -62,13 +64,16 @@ fun SignUpScreen(navController: NavController) {
         Spacer(modifier = Modifier.height(40.dp))
 
         OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
+            value = username,
+            onValueChange = { username = it },
+            label = { Text("Username") },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
+
+        // Bỏ ô nhập liệu cho Email
+
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
@@ -90,8 +95,8 @@ fun SignUpScreen(navController: NavController) {
 
         Button(
             onClick = {
-                // Cập nhật lại logic kiểm tra
-                if (email.isBlank() || password.isBlank()) {
+                // Bỏ kiểm tra email.isBlank()
+                if (username.isBlank() || password.isBlank()) {
                     Toast.makeText(context, "Vui lòng nhập đầy đủ thông tin.", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
@@ -101,15 +106,27 @@ fun SignUpScreen(navController: NavController) {
                 }
                 coroutineScope.launch {
                     try {
-                        // Chỉ tạo user trong Authentication, không lưu vào Firestore
-                        auth.createUserWithEmailAndPassword(email.trim(), password.trim()).await()
+                        // Tự động tạo một email giả từ username
+                        val fakeEmail = "${username.trim()}@example.com"
+
+                        // Dùng email giả để tạo tài khoản
+                        val authResult = auth.createUserWithEmailAndPassword(fakeEmail, password.trim()).await()
+                        val firebaseUser = authResult.user
+
+                        if (firebaseUser != null) {
+                            val userMap = hashMapOf(
+                                "uid" to firebaseUser.uid,
+                                "username" to username.trim(),
+                                "email" to fakeEmail // Lưu email giả vào Firestore để đăng nhập
+                            )
+                            db.collection("users").document(firebaseUser.uid).set(userMap).await()
+                        }
 
                         Toast.makeText(context, "Đăng ký thành công! Vui lòng đăng nhập.", Toast.LENGTH_LONG).show()
                         navController.navigate("login") { popUpTo("login") { inclusive = true } }
                     } catch (e: Exception) {
                         Log.e("SignUp", "Đăng ký thất bại", e)
-                        val message = e.message ?: "Đã có lỗi xảy ra."
-                        Toast.makeText(context, "Đăng ký thất bại: $message", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Đăng ký thất bại: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 }
             },
@@ -126,6 +143,7 @@ fun SignUpScreen(navController: NavController) {
     }
 }
 
+// Composable LoginText không thay đổi
 @Composable
 fun LoginText(navController: NavController) {
     val annotatedText = buildAnnotatedString {

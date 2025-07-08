@@ -12,9 +12,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.thehub.ui.theme.TheHubTheme
-import com.example.thehub.HomeScreen
-import com.example.thehub.LoginScreen
-import com.example.thehub.SignUpScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.GoogleAuthProvider
@@ -37,17 +38,29 @@ import kotlinx.coroutines.tasks.await
 
 @Composable
 fun LoginScreen(navController: NavController) {
+    // Sử dụng lại Email và Password
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val auth = Firebase.auth
 
+    // Hàm điều hướng đến trang chủ
     fun navigateToHome() {
         Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
         navController.navigate("home") {
             popUpTo("login") { inclusive = true }
         }
+    }
+
+    // --- GOOGLE LOGIN SETUP ---
+    val googleSignInClient = remember {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(context.getString(R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+        GoogleSignIn.getClient(context, gso)
     }
 
     val googleSignInLauncher = rememberLauncherForActivityResult(
@@ -64,7 +77,7 @@ fun LoginScreen(navController: NavController) {
                         auth.signInWithCredential(credential).await()
                         navigateToHome()
                     } catch (e: Exception) {
-                        Log.e("FirebaseAuth", "Firebase sign-in failed", e)
+                        Log.e("FirebaseAuth", "Firebase sign-in with Google failed", e)
                     }
                 }
             } catch (e: ApiException) {
@@ -73,10 +86,11 @@ fun LoginScreen(navController: NavController) {
         }
     }
 
+    // dao dien
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFFFFFF))
+            .background(Color.White)
             .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -94,6 +108,8 @@ fun LoginScreen(navController: NavController) {
             color = Color.Black
         )
         Spacer(modifier = Modifier.height(40.dp))
+
+        // nhập Email
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -114,31 +130,23 @@ fun LoginScreen(navController: NavController) {
         Text(text = "or", color = Color.Gray, fontSize = 14.sp)
         Spacer(modifier = Modifier.height(16.dp))
 
-        val googleSignInClient = remember {
-            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(context.getString(R.string.default_web_client_id))
-                .requestEmail()
-                .build()
-            GoogleSignIn.getClient(context, gso)
-        }
-
+        // Nút đăng nhập Google
         SocialLoginButton(
             text = "Continue with Google",
             iconResId = R.drawable.logogoogle,
             onClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) }
         )
         Spacer(modifier = Modifier.height(16.dp))
-        SocialLoginButton(
-            text = "Continue with Facebook",
-            iconResId = R.drawable.logofacebook,
-            onClick = { /* TODO */ }
-        )
-        Spacer(modifier = Modifier.height(32.dp))
 
+
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        //  Đăng nhập bằng username/Password
         Button(
             onClick = {
                 if (email.isBlank() || password.isBlank()) {
-                    Toast.makeText(context, "Vui lòng nhập email và mật khẩu.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Vui lòng nhập username và mật khẩu.", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
                 coroutineScope.launch {
@@ -146,6 +154,7 @@ fun LoginScreen(navController: NavController) {
                         auth.signInWithEmailAndPassword(email.trim(), password.trim()).await()
                         navigateToHome()
                     } catch (e: Exception) {
+                        Log.e("LoginScreen", "Đăng nhập thất bại", e)
                         Toast.makeText(context, "Đăng nhập thất bại: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 }
