@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -70,7 +71,6 @@ fun SignUpScreen(navController: NavController) {
             shape = RoundedCornerShape(8.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
-
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
@@ -102,18 +102,33 @@ fun SignUpScreen(navController: NavController) {
                 }
                 coroutineScope.launch {
                     try {
-                        // Tạo email giả cho Firebase Auth bằng cách thêm tên miền
-                        val emailForAuth = "${username.trim()}@example.com"
+                        val trimmedUsername = username.trim()
 
-                        // Use the fake email to create the account in Firebase Auth
+                        //  Kiểm tra xem username đã tồn tại trong Firestore chưa
+                        val usersRef = db.collection("users")
+                        val usernameQuery = usersRef.whereEqualTo("username", trimmedUsername).limit(1).get().await()
+                        if (!usernameQuery.isEmpty) {
+                            Toast.makeText(context, "Username này đã tồn tại.", Toast.LENGTH_LONG).show()
+                            return@launch
+                        }
+
+                        // Xử lý thông minh: Nếu username là email, dùng nó. Nếu không, tạo email giả.
+                        val emailForAuth = if (android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedUsername).matches()) {
+                            trimmedUsername
+                        } else {
+                            "$trimmedUsername@example.com"
+                        }
+
+                        //  Tạo tài khoản trong Firebase Authentication
                         val authResult = auth.createUserWithEmailAndPassword(emailForAuth, password.trim()).await()
                         val firebaseUser = authResult.user
 
+                        //  Lưu thông tin người dùng vào Firestore
                         if (firebaseUser != null) {
-                            // Lưu trữ tên người dùng thực tế (không có tên miền) trong Firestore
                             val userMap = hashMapOf(
                                 "uid" to firebaseUser.uid,
-                                "username" to username.trim()
+                                "username" to trimmedUsername,
+                                "emailForAuth" to emailForAuth // Lưu email đã dùng để xác thực
                             )
                             db.collection("users").document(firebaseUser.uid).set(userMap).await()
                         }
@@ -122,7 +137,11 @@ fun SignUpScreen(navController: NavController) {
                         navController.navigate("login") { popUpTo("login") { inclusive = true } }
                     } catch (e: Exception) {
                         Log.e("SignUp", "Đăng ký thất bại", e)
-                        Toast.makeText(context, "Đăng ký thất bại: ${e.message}", Toast.LENGTH_LONG).show()
+                        if (e is FirebaseAuthUserCollisionException) {
+                            Toast.makeText(context, "Username hoặc email tương ứng đã được sử dụng.", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(context, "Đăng ký thất bại: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             },

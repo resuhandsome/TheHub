@@ -30,8 +30,10 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -44,6 +46,7 @@ fun LoginScreen(navController: NavController) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val auth = Firebase.auth
+    val db = Firebase.firestore
 
     fun navigateToHome() {
         Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
@@ -133,7 +136,6 @@ fun LoginScreen(navController: NavController) {
             onClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) }
         )
         Spacer(modifier = Modifier.height(16.dp))
-
         Spacer(modifier = Modifier.height(16.dp))
 
         // nhập Username/Password
@@ -145,13 +147,35 @@ fun LoginScreen(navController: NavController) {
                 }
                 coroutineScope.launch {
                     try {
-                        // Append domain to username to create the email for Firebase Auth
-                        val emailForAuth = "${username.trim()}@example.com"
-                        auth.signInWithEmailAndPassword(emailForAuth, password.trim()).await()
-                        navigateToHome()
+                        val trimmedUsername = username.trim()
+
+                        // 1. Tìm trong Firestore để lấy email đã dùng để xác thực
+                        val usersRef = db.collection("users")
+                        val query = usersRef.whereEqualTo("username", trimmedUsername).limit(1).get().await()
+
+                        if (query.isEmpty) {
+                            Toast.makeText(context, "Username không tồn tại.", Toast.LENGTH_LONG).show()
+                            return@launch
+                        }
+
+                        // 2. Lấy ra email đã lưu
+                        val userDoc = query.documents[0]
+                        val emailForAuth = userDoc.getString("emailForAuth")
+
+                        if (emailForAuth != null) {
+                            // 3. Dùng email đó và mật khẩu để đăng nhập
+                            auth.signInWithEmailAndPassword(emailForAuth, password.trim()).await()
+                            navigateToHome()
+                        } else {
+                            Toast.makeText(context, "Lỗi dữ liệu người dùng.", Toast.LENGTH_LONG).show()
+                        }
                     } catch (e: Exception) {
                         Log.e("LoginScreen", "Đăng nhập thất bại", e)
-                        Toast.makeText(context, "Đăng nhập thất bại: ${e.message}", Toast.LENGTH_LONG).show()
+                        if (e is FirebaseAuthInvalidCredentialsException) {
+                            Toast.makeText(context, "Sai mật khẩu. Vui lòng thử lại.", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(context, "Đăng nhập thất bại: Lỗi hệ thống.", Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             },
