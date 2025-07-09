@@ -12,6 +12,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.thehub.ui.theme.TheHubTheme
+import com.example.thehub.AppNavigation
+import com.example.thehub.ProfileScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,7 +30,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
@@ -40,7 +41,12 @@ fun AppNavigation() {
             SignUpScreen(navController = navController)
         }
         composable("home") {
-            HomeScreen()
+            // 1. Truyền navController vào đây
+            HomeScreen(navController = navController)
+        }
+        // 2. Thêm route cho màn hình profile
+        composable("profile") {
+            ProfileScreen(navController = navController)
         }
     }
 }

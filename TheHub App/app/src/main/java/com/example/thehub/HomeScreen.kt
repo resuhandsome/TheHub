@@ -27,6 +27,9 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+import androidx.navigation.NavController
+import androidx.compose.foundation.clickable
+
 
 // Lớp dữ liệu đại diện cho một bài đăng
 data class Post(
@@ -62,7 +65,7 @@ val samplePosts = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(navController: NavController) {
     // Lấy thông tin người dùng hiện tại từ Firebase Auth
     val currentUser = Firebase.auth.currentUser
 
@@ -121,23 +124,30 @@ fun HomeScreen() {
                     Spacer(modifier = Modifier.width(16.dp))
 
                     // Avatar người dùng
-                    if (avatarUrl != null) {
-                        AsyncImage(
-                            model = avatarUrl,
-                            contentDescription = "User Avatar",
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Image(
-                            painter = painterResource(id = defaultAvatar),
-                            contentDescription = "Default Avatar",
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                        )
+                    Box(
+                        modifier = Modifier.clickable {
+                            // Lệnh điều hướng đến màn hình profile
+                            navController.navigate("profile")
+                        }
+                    ) {
+                        if (avatarUrl != null) {
+                            AsyncImage(
+                                model = avatarUrl,
+                                contentDescription = "User Avatar",
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Image(
+                                painter = painterResource(id = defaultAvatar),
+                                contentDescription = "Default Avatar",
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                            )
+                        }
                     }
                 }
             }
