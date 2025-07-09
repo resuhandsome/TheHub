@@ -23,14 +23,12 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
-import com.google.firebase.auth.FirebaseAuth
 import com.example.thehub.ui.theme.TheHubTheme
+import com.google.firebase.auth.FirebaseAuth
 
-// Màn hình Profile chính, nhận NavController để xử lý điều hướng
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(navController: NavController) {
-    // Lấy dữ liệu ở đây
     val currentUser = FirebaseAuth.getInstance().currentUser
     val photoUrl = currentUser?.photoUrl
 
@@ -38,8 +36,8 @@ fun ProfileScreen(navController: NavController) {
         containerColor = Color.Black,
         topBar = {
             ProfileTopAppBar(
-                onBackClick = { navController.popBackStack() }, // Quay lại màn hình trước
-                onSettingsClick = { /* TODO: Điều hướng đến màn hình cài đặt */ }
+                onBackClick = { navController.popBackStack() },
+                onSettingsClick = { navController.navigate("setting") }
             )
         },
         bottomBar = { ProfileBottomNavBar() }
@@ -51,20 +49,15 @@ fun ProfileScreen(navController: NavController) {
                 .fillMaxSize(),
             contentPadding = PaddingValues(2.dp)
         ) {
-            // Header của trang Profile
             item(span = { GridItemSpan(3) }) {
-                // Truyền dữ liệu photoUrl vào hàm con
                 ProfileHeader(photoUrl = photoUrl)
             }
-            // Nút "Edit Profile"
             item(span = { GridItemSpan(3) }) {
                 EditProfileButton()
             }
-            // Tab "Your Posts"
             item(span = { GridItemSpan(3) }) {
                 YourPostsTab()
             }
-            // Lưới 9 bài đăng (dùng ảnh placeholder)
             items(9) {
                 PostItemPlaceholder()
             }
@@ -72,7 +65,6 @@ fun ProfileScreen(navController: NavController) {
     }
 }
 
-// TopAppBar giờ chỉ nhận sự kiện click, không tự xử lý logic
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileTopAppBar(onBackClick: () -> Unit, onSettingsClick: () -> Unit) {
@@ -95,9 +87,8 @@ fun ProfileTopAppBar(onBackClick: () -> Unit, onSettingsClick: () -> Unit) {
     )
 }
 
-// ProfileHeader giờ chỉ nhận dữ liệu và hiển thị, không tự lấy dữ liệu
 @Composable
-fun ProfileHeader(photoUrl: Any?) { // Nhận url ảnh làm tham số
+fun ProfileHeader(photoUrl: Any?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -189,24 +180,10 @@ fun ProfileBottomNavBar() {
     }
 }
 
-
-// Hàm Preview này không gọi Firebase hay NavController thật
-// Nó chỉ dựng giao diện tĩnh để xem trước
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Preview(showBackground = true)
 @Composable
 fun ProfileScreenPreview() {
-    TheHubTheme { // Bọc trong theme của bạn để có màu sắc đúng
-        Scaffold(
-            containerColor = Color.Black,
-            topBar = { ProfileTopAppBar(onBackClick = {}, onSettingsClick = {}) },
-            bottomBar = { ProfileBottomNavBar() }
-        ) { paddingValues ->
-            Column(modifier = Modifier.padding(paddingValues)) {
-                // Truyền dữ liệu giả (null) vào đây để xem trước giao diện
-                ProfileHeader(photoUrl = null)
-                EditProfileButton()
-                YourPostsTab()
-            }
-        }
+    TheHubTheme {
+        ProfileScreen(navController = rememberNavController())
     }
 }

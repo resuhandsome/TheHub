@@ -51,5 +51,9 @@ fun AppNavigation() {
         composable("post") {
             PostScreen(navController = navController)
         }
+        //setting
+        composable("setting") {
+            SettingScreen(navController = navController)
+        }
     }
 }
