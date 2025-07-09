@@ -105,7 +105,7 @@ fun SignUpScreen(navController: NavController) {
                         // Tạo email giả cho Firebase Auth bằng cách thêm tên miền
                         val emailForAuth = "${username.trim()}@example.com"
 
-                        // Sử dụng email giả để tạo tài khoản trong Firebase Auth
+                        // Use the fake email to create the account in Firebase Auth
                         val authResult = auth.createUserWithEmailAndPassword(emailForAuth, password.trim()).await()
                         val firebaseUser = authResult.user
 
