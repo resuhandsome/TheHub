@@ -3,6 +3,7 @@ package com.example.thehub
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,11 +25,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
-import androidx.navigation.NavController
-import androidx.compose.foundation.clickable
 
 
 // Lớp dữ liệu đại diện cho một bài đăng
@@ -40,7 +40,7 @@ data class Post(
     val imageUrl: String? = null
 )
 
-// bài đăng mẫu
+// Dữ liệu mẫu cho danh sách bài đăng
 val samplePosts = listOf(
     Post(
         author = "deanobeidallah",
@@ -58,7 +58,7 @@ val samplePosts = listOf(
         author = "viktoraxelsen",
         authorAvatarUrl = "https://i.pravatar.cc/150?u=viktor",
         time = "7 giờ",
-        content = "A good day of filming for my fantastic partner HELM, together with The Company Film, Aarhus 😊🤝🎬",
+        content = "A good day of filming for my fantastic partner HELM, together with The Company Film, Aarhus 😊�🎬",
         imageUrl = "https://i.imgur.com/8a3n2fC.jpeg"
     )
 )
@@ -82,9 +82,14 @@ fun HomeScreen(navController: NavController) {
                     .background(Color(0xFFF8F8F8))
                     .padding(start = 16.dp, end = 16.dp, top = 30.dp, bottom = 8.dp)
             ) {
-                //Logo và Tên logo
+                // Hàng trên cùng: Logo và Tên logo (có thể nhấn để về home)
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        navController.navigate("home") {
+                            popUpTo("home") { inclusive = true }
+                        }
+                    }
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.logothehub),
@@ -101,21 +106,27 @@ fun HomeScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                //  Thanh tìm kiếm và Avatar
+                //  Hàng thứ hai: Thanh tìm kiếm và Avatar
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     var searchText by remember { mutableStateOf("") }
+                    // Thanh tìm kiếm đã được tùy chỉnh
                     TextField(
                         value = searchText,
                         onValueChange = { searchText = it },
-                        placeholder = { Text("Search...", fontSize = 14.sp) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search Icon") },
+                        placeholder = { Text("Search...", fontSize = 13.sp, color = Color.Black) },
+                        trailingIcon = { Icon(Icons.Default.Search, contentDescription = "Search Icon", tint = Color.Black) },
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp),
-                        shape = RoundedCornerShape(8.dp),
+                            .height(48.dp)
+                            .border(width = 1.dp, color = Color.Black, shape = RoundedCornerShape(30.dp)),
+                        shape = RoundedCornerShape(30.dp),
                         colors = TextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            unfocusedContainerColor = Color(0xFFD1E4F9),
+                            focusedContainerColor = Color(0xFFD1E4F9),
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent
                         )
@@ -123,10 +134,9 @@ fun HomeScreen(navController: NavController) {
 
                     Spacer(modifier = Modifier.width(16.dp))
 
-                    // Avatar người dùng
+                    // Avatar người dùng (có thể nhấn để vào profile)
                     Box(
                         modifier = Modifier.clickable {
-                            // Lệnh điều hướng đến màn hình profile
                             navController.navigate("profile")
                         }
                     ) {
@@ -158,16 +168,26 @@ fun HomeScreen(navController: NavController) {
                 containerColor = Color.White,
                 contentPadding = PaddingValues(horizontal = 16.dp)
             ) {
-                // thông báo
-                IconButton(onClick = { /*TODO*/ }, modifier = Modifier.weight(1f)) {
+                // Nút thông báo
+                IconButton(onClick = { navController.navigate("notification") }, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Notifications, contentDescription = "Notifications")
                 }
-                // thêm bài
-                IconButton(onClick = { /*TODO*/ }, modifier = Modifier.weight(1f)) {
+                // Nút thêm bài
+                IconButton(onClick = { navController.navigate("post") }, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Add, contentDescription = "Add Post")
                 }
-                // ngôi nhà
-                IconButton(onClick = { /*TODO*/ }, modifier = Modifier.weight(1f)) {
+                // Nút về trang chủ
+                IconButton(
+                    onClick = {
+                        // Lệnh này điều hướng đến route "home"
+                        // và xóa tất cả các màn hình trên nó khỏi backstack
+                        // để đảm bảo bạn luôn quay về một trang chủ duy nhất.
+                        navController.navigate("home") {
+                            popUpTo("home") { inclusive = true }
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
                     Icon(Icons.Default.Home, contentDescription = "Home")
                 }
             }
@@ -220,7 +240,6 @@ fun PostItem(post: Post) {
 
         // Hình ảnh của bài đăng (nếu có)
         if (post.imageUrl != null) {
-            Spacer(modifier = Modifier.height(12.dp))
             AsyncImage(
                 model = post.imageUrl,
                 contentDescription = "Post Image",
@@ -238,17 +257,17 @@ fun PostItem(post: Post) {
             Icon(
                 painter = painterResource(id = R.drawable.icontim),
                 contentDescription = "Like",
-                modifier = Modifier.size(24.dp) // Chỉnh kích thước icon
+                modifier = Modifier.size(24.dp)
             )
             Icon(
                 painter = painterResource(id = R.drawable.iconbinhluan),
                 contentDescription = "Comment",
-                modifier = Modifier.size(24.dp) // Chỉnh kích thước icon
+                modifier = Modifier.size(24.dp)
             )
             Icon(
                 painter = painterResource(id = R.drawable.iconchiase),
                 contentDescription = "Share",
-                modifier = Modifier.size(24.dp) // Chỉnh kích thước icon
+                modifier = Modifier.size(24.dp)
             )
         }
     }
