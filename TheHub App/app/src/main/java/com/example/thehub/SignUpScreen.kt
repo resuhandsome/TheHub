@@ -32,7 +32,6 @@ import kotlinx.coroutines.tasks.await
 @Composable
 fun SignUpScreen(navController: NavController) {
     var username by remember { mutableStateOf("") }
-    // var email by remember { mutableStateOf("") } // Bỏ state email
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
@@ -72,8 +71,6 @@ fun SignUpScreen(navController: NavController) {
         )
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Bỏ ô nhập liệu cho Email
-
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
@@ -95,7 +92,6 @@ fun SignUpScreen(navController: NavController) {
 
         Button(
             onClick = {
-                // Bỏ kiểm tra email.isBlank()
                 if (username.isBlank() || password.isBlank()) {
                     Toast.makeText(context, "Vui lòng nhập đầy đủ thông tin.", Toast.LENGTH_SHORT).show()
                     return@Button
@@ -106,18 +102,18 @@ fun SignUpScreen(navController: NavController) {
                 }
                 coroutineScope.launch {
                     try {
-                        // Tự động tạo một email giả từ username
-                        val fakeEmail = "${username.trim()}@example.com"
+                        // Tạo email giả cho Firebase Auth bằng cách thêm tên miền
+                        val emailForAuth = "${username.trim()}@example.com"
 
-                        // Dùng email giả để tạo tài khoản
-                        val authResult = auth.createUserWithEmailAndPassword(fakeEmail, password.trim()).await()
+                        // Sử dụng email giả để tạo tài khoản trong Firebase Auth
+                        val authResult = auth.createUserWithEmailAndPassword(emailForAuth, password.trim()).await()
                         val firebaseUser = authResult.user
 
                         if (firebaseUser != null) {
+                            // Lưu trữ tên người dùng thực tế (không có tên miền) trong Firestore
                             val userMap = hashMapOf(
                                 "uid" to firebaseUser.uid,
-                                "username" to username.trim(),
-                                "email" to fakeEmail // Lưu email giả vào Firestore để đăng nhập
+                                "username" to username.trim()
                             )
                             db.collection("users").document(firebaseUser.uid).set(userMap).await()
                         }
@@ -143,7 +139,6 @@ fun SignUpScreen(navController: NavController) {
     }
 }
 
-// Composable LoginText không thay đổi
 @Composable
 fun LoginText(navController: NavController) {
     val annotatedText = buildAnnotatedString {

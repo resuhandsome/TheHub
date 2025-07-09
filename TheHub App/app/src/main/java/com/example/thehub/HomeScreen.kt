@@ -1,245 +1,219 @@
 package com.example.thehub
 
+import android.app.Activity
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import androidx.navigation.NavController
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
-// Lớp dữ liệu đại diện cho một bài đăng
-data class Post(
-    val author: String,
-    val authorAvatarUrl: String,
-    val time: String,
-    val content: String,
-    val imageUrl: String? = null
-)
-
-// bài đăng mẫu
-val samplePosts = listOf(
-    Post(
-        author = "deanobeidallah",
-        authorAvatarUrl = "https://i.pravatar.cc/150?u=deano",
-        time = "1 ngày",
-        content = "Trump started the fire with his erratic tariffs now he surrenders. Yet media claims Trump is a savior for making a trade deal with China. There is NO deal. Trump surrendered but not before he caused much pain to small and mid-sized businesses, dock workers, truckers and people with 401ks/stocks"
-    ),
-    Post(
-        author = "walsh_freedom",
-        authorAvatarUrl = "https://i.pravatar.cc/150?u=walsh",
-        time = "1 ngày",
-        content = "So economically, the next four years are gonna be just an endless cycle of 90 day “pauses” on all the bad shit Trump tries to do, huh?"
-    ),
-    Post(
-        author = "viktoraxelsen",
-        authorAvatarUrl = "https://i.pravatar.cc/150?u=viktor",
-        time = "7 giờ",
-        content = "A good day of filming for my fantastic partner HELM, together with The Company Film, Aarhus 😊🤝🎬",
-        imageUrl = "https://i.imgur.com/8a3n2fC.jpeg"
-    )
-)
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
-    // Lấy thông tin người dùng hiện tại từ Firebase Auth
-    val currentUser = Firebase.auth.currentUser
+fun LoginScreen(navController: NavController) {
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
 
-    // Xác định avatar để hiển thị
-    val avatarUrl = currentUser?.photoUrl
-    val defaultAvatar = R.drawable.logomacdinh
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val auth = Firebase.auth
 
-    Scaffold(
-        topBar = {
-            // Sử dụng Column để xếp chồng các thành phần theo chiều dọc
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF8F8F8))
-                    .padding(start = 16.dp, end = 16.dp, top = 30.dp, bottom = 8.dp)
-            ) {
-                //Logo và Tên logo
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.logothehub),
-                        contentDescription = "App Logo",
-                        modifier = Modifier.height(60.dp)
-                    )
-                    Spacer(modifier = Modifier.width(15.dp))
-                    Text(
-                        text = "TheHub",
-                        fontSize = 25.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+    fun navigateToHome() {
+        Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
+        navController.navigate("home") {
+            popUpTo("login") { inclusive = true }
+        }
+    }
 
-                Spacer(modifier = Modifier.height(12.dp))
+    // --- GOOGLE LOGIN SETUP ---
+    val googleSignInClient = remember {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(context.getString(R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+        GoogleSignIn.getClient(context, gso)
+    }
 
-                //  Thanh tìm kiếm và Avatar
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    var searchText by remember { mutableStateOf("") }
-                    TextField(
-                        value = searchText,
-                        onValueChange = { searchText = it },
-                        placeholder = { Text("Search...", fontSize = 14.sp) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search Icon") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(40.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    // Avatar người dùng
-                    if (avatarUrl != null) {
-                        AsyncImage(
-                            model = avatarUrl,
-                            contentDescription = "User Avatar",
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Image(
-                            painter = painterResource(id = defaultAvatar),
-                            contentDescription = "Default Avatar",
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                        )
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)!!
+                val idToken = account.idToken!!
+                coroutineScope.launch {
+                    try {
+                        val credential = GoogleAuthProvider.getCredential(idToken, null)
+                        auth.signInWithCredential(credential).await()
+                        navigateToHome()
+                    } catch (e: Exception) {
+                        Log.e("FirebaseAuth", "Firebase sign-in with Google failed", e)
                     }
                 }
-            }
-        },
-        bottomBar = {
-            // Thanh điều hướng dưới cùng
-            BottomAppBar(
-                containerColor = Color.White,
-                contentPadding = PaddingValues(horizontal = 16.dp)
-            ) {
-                // thông báo
-                IconButton(onClick = { /*TODO*/ }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Notifications, contentDescription = "Notifications")
-                }
-                // thêm bài
-                IconButton(onClick = { /*TODO*/ }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Post")
-                }
-                // ngôi nhà
-                IconButton(onClick = { /*TODO*/ }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Home, contentDescription = "Home")
-                }
+            } catch (e: ApiException) {
+                Log.w("GoogleSignIn", "Google sign in failed", e)
             }
         }
-    ) { paddingValues ->
-        // Nội dung chính - Danh sách các bài đăng
-        LazyColumn(
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.logothehub),
+            contentDescription = "App Logo",
+            modifier = Modifier.size(100.dp)
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = "Login in to TheHub",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black
+        )
+        Spacer(modifier = Modifier.height(40.dp))
+
+        // đầu vào của Username
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it },
+            label = { Text("Username") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Your password") },
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp)
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+        Text(text = "or", color = Color.Gray, fontSize = 14.sp)
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SocialLoginButton(
+            text = "Continue with Google",
+            iconResId = R.drawable.logogoogle,
+            onClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) }
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // nhập  Username/Password
+        Button(
+            onClick = {
+                if (username.isBlank() || password.isBlank()) {
+                    Toast.makeText(context, "Vui lòng nhập username và mật khẩu.", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+                coroutineScope.launch {
+                    try {
+                        // Append domain to username to create the email for Firebase Auth
+                        val emailForAuth = "${username.trim()}@example.com"
+                        auth.signInWithEmailAndPassword(emailForAuth, password.trim()).await()
+                        navigateToHome()
+                    } catch (e: Exception) {
+                        Log.e("LoginScreen", "Đăng nhập thất bại", e)
+                        Toast.makeText(context, "Đăng nhập thất bại: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color.White)
+                .fillMaxWidth()
+                .height(50.dp),
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
         ) {
-            items(samplePosts) { post ->
-                PostItem(post = post)
-                Divider(color = Color.LightGray, thickness = 0.5.dp)
-            }
+            Text(text = "LOGIN", color = Color.White, fontSize = 16.sp)
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+        SignUpText(navController = navController)
+    }
+}
+
+@Composable
+fun SocialLoginButton(text: String, iconResId: Int, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp),
+        shape = RoundedCornerShape(8.dp),
+        border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Image(
+                painter = painterResource(id = iconResId),
+                contentDescription = "$text icon",
+                modifier = Modifier.size(24.dp),
+                contentScale = ContentScale.Fit
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(text = text, color = Color.Black, fontSize = 16.sp)
         }
     }
 }
 
 @Composable
-fun PostItem(post: Post) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        // Phần đầu của bài đăng (avatar, tên tác giả, thời gian)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            AsyncImage(
-                model = post.authorAvatarUrl,
-                contentDescription = "Author Avatar",
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = post.author, fontWeight = FontWeight.Bold)
-                Text(text = post.time, fontSize = 12.sp, color = Color.Gray)
-            }
+fun SignUpText(navController: NavController) {
+    val annotatedText = buildAnnotatedString {
+        withStyle(style = SpanStyle(color = Color.Gray, fontSize = 14.sp)) {
+            append("Don't have an account? ")
         }
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Nội dung bài đăng
-        Text(text = post.content, fontSize = 14.sp)
-
-        // Hình ảnh của bài đăng (nếu có)
-        if (post.imageUrl != null) {
-            Spacer(modifier = Modifier.height(12.dp))
-            AsyncImage(
-                model = post.imageUrl,
-                contentDescription = "Post Image",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
+        pushStringAnnotation(tag = "SignUp", annotation = "SignUp")
+        withStyle(style = SpanStyle(color = Color(0xFF0052D4), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)) {
+            append("Sign up")
         }
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Các nút hành động (Thích, Bình luận, Chia sẻ)
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            Icon(
-                painter = painterResource(id = R.drawable.icontim),
-                contentDescription = "Like",
-                modifier = Modifier.size(24.dp) // Chỉnh kích thước icon
-            )
-            Icon(
-                painter = painterResource(id = R.drawable.iconbinhluan),
-                contentDescription = "Comment",
-                modifier = Modifier.size(24.dp) // Chỉnh kích thước icon
-            )
-            Icon(
-                painter = painterResource(id = R.drawable.iconchiase),
-                contentDescription = "Share",
-                modifier = Modifier.size(24.dp) // Chỉnh kích thước icon
-            )
-        }
+        pop()
     }
+    ClickableText(
+        text = annotatedText,
+        onClick = { offset ->
+            annotatedText.getStringAnnotations(tag = "SignUp", start = offset, end = offset)
+                .firstOrNull()?.let {
+                    navController.navigate("signup")
+                }
+        }
+    )
 }
