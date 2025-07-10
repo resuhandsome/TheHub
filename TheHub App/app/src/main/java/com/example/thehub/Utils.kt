@@ -1,14 +1,32 @@
 package com.example.thehub
 
-// Helper function để format thời gian - dùng chung cho toàn app
+import java.text.SimpleDateFormat
+import java.util.*
+
+/**
+ * Utility functions for TheHub app
+ */
+
 fun formatTime(timestamp: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - timestamp
 
     return when {
-        diff < 60000 -> "Vừa xong"
-        diff < 3600000 -> "${diff / 60000} phút"
-        diff < 86400000 -> "${diff / 3600000} giờ"
-        else -> "${diff / 86400000} ngày"
+        diff < 60 * 1000 -> "vừa xong"
+        diff < 60 * 60 * 1000 -> "${diff / (60 * 1000)} phút trước"
+        diff < 24 * 60 * 60 * 1000 -> "${diff / (60 * 60 * 1000)} giờ trước"
+        diff < 7 * 24 * 60 * 60 * 1000 -> "${diff / (24 * 60 * 60 * 1000)} ngày trước"
+        else -> {
+            val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            sdf.format(Date(timestamp))
+        }
+    }
+}
+
+fun formatNumber(number: Int): String {
+    return when {
+        number < 1000 -> number.toString()
+        number < 1000000 -> String.format("%.1fK", number / 1000.0)
+        else -> String.format("%.1fM", number / 1000000.0)
     }
 }

@@ -1,3 +1,4 @@
+// GIỮ NGUYÊN TẤT CẢ IMPORTS VÀ DATA CLASS POST CỦA BẠN
 package com.example.thehub
 
 import android.widget.Toast
@@ -23,8 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -40,6 +39,7 @@ import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+// GIỮ NGUYÊN DATA CLASS POST CỦA BẠN
 data class Post(
     val id: String = "",
     val authorId: String = "",
@@ -60,6 +60,7 @@ fun HomeScreen(navController: NavController) {
     val currentUser = Firebase.auth.currentUser
     val defaultAvatar = R.drawable.logomacdinh
 
+    // GIỮ NGUYÊN TẤT CẢ FIREBASE LOGIC CỦA BẠN
     var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var currentUserProfile by remember { mutableStateOf<UserProfile?>(null) }
@@ -67,14 +68,13 @@ fun HomeScreen(navController: NavController) {
     val db = Firebase.firestore
     val context = LocalContext.current
 
-    // Load user profile
+    // GIỮ NGUYÊN FIREBASE LOADING LOGIC
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             currentUserProfile = UserRepository.getCurrentUserProfile()
         }
     }
 
-    // Load posts with user profiles
     LaunchedEffect(Unit) {
         try {
             val postsSnapshot = db.collection("posts")
@@ -89,7 +89,6 @@ fun HomeScreen(navController: NavController) {
                 var authorName = doc.getString("authorName") ?: "Unknown User"
                 var authorAvatarUrl = doc.getString("authorAvatarUrl") ?: ""
 
-                // Load author profile from Firestore if authorName is Unknown User
                 if (authorName == "Unknown User" && authorId.isNotEmpty()) {
                     try {
                         val authorProfile = UserRepository.getUserProfile(authorId)
@@ -130,11 +129,11 @@ fun HomeScreen(navController: NavController) {
 
     Scaffold(
         topBar = {
-            // Top Bar được thiết kế lại đẹp mắt
+            // CHỈ SỬA COLORS, GIỮ NGUYÊN LAYOUT
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shadowElevation = 4.dp,
-                color = Color.White
+                color = MaterialTheme.colorScheme.surface // ✅ Thay Color.White
             ) {
                 Column(
                     modifier = Modifier
@@ -142,7 +141,6 @@ fun HomeScreen(navController: NavController) {
                         .padding(horizontal = 20.dp, vertical = 16.dp)
                         .statusBarsPadding()
                 ) {
-                    // Logo và Tên logo - điều chỉnh vị trí
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
@@ -150,28 +148,26 @@ fun HomeScreen(navController: NavController) {
                         Image(
                             painter = painterResource(id = R.drawable.logothehub),
                             contentDescription = "App Logo",
-                            modifier = Modifier.size(50.dp) // Giảm size logo một chút
+                            modifier = Modifier.size(50.dp)
                         )
 
                         Spacer(modifier = Modifier.width(12.dp))
 
-                        // Chữ TheHub thấp xuống một chút
                         Text(
                             text = "TheHub",
-                            fontSize = 24.sp, // Giảm size chữ
+                            fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1A1A1A),
-                            modifier = Modifier.offset(y = 2.dp) // Thấp xuống 2dp
+                            color = MaterialTheme.colorScheme.onSurface, // ✅ Thay Color(0xFF1A1A1A)
+                            modifier = Modifier.offset(y = 2.dp)
                         )
 
                         Spacer(modifier = Modifier.weight(1f))
 
-                        // Avatar người dùng với border đẹp - THÊM NAVIGATION
                         Box(
                             modifier = Modifier
                                 .size(42.dp)
                                 .shadow(2.dp, CircleShape)
-                                .clickable { navController.navigate("profile") } // THÊM DÒNG NÀY
+                                .clickable { navController.navigate("profile") }
                         ) {
                             AsyncImage(
                                 model = currentUserProfile?.avatarUrl?.takeIf { it.isNotEmpty() }
@@ -180,7 +176,7 @@ fun HomeScreen(navController: NavController) {
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .clip(CircleShape)
-                                    .background(Color.Gray.copy(alpha = 0.2f)),
+                                    .background(MaterialTheme.colorScheme.surfaceVariant), // ✅ Thay Color.Gray.copy()
                                 contentScale = ContentScale.Crop,
                                 placeholder = painterResource(id = defaultAvatar)
                             )
@@ -189,7 +185,6 @@ fun HomeScreen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Thanh tìm kiếm được thiết kế lại
                     TextField(
                         value = "",
                         onValueChange = { },
@@ -197,14 +192,14 @@ fun HomeScreen(navController: NavController) {
                             Text(
                                 "Tìm kiếm bài viết, người dùng...",
                                 fontSize = 14.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant // ✅ Thay Color.Gray
                             )
                         },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Search,
                                 contentDescription = "Search Icon",
-                                tint = Color.Gray,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thay Color.Gray
                                 modifier = Modifier.clickable {
                                     navController.navigate("search")
                                 }
@@ -216,12 +211,12 @@ fun HomeScreen(navController: NavController) {
                             .clickable { navController.navigate("search") },
                         shape = RoundedCornerShape(24.dp),
                         colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFFF5F5F5),
-                            unfocusedContainerColor = Color(0xFFF5F5F5),
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledContainerColor = Color(0xFFF5F5F5),
-                            disabledIndicatorColor = Color.Transparent
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, // ✅ Thay Color(0xFFF5F5F5)
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
                         ),
                         enabled = false
                     )
@@ -229,11 +224,11 @@ fun HomeScreen(navController: NavController) {
             }
         },
         bottomBar = {
-            // Bottom Navigation được thiết kế lại đẹp mắt
+            // CHỈ SỬA COLORS, GIỮ NGUYÊN LAYOUT
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shadowElevation = 8.dp,
-                color = Color.White
+                color = MaterialTheme.colorScheme.surface // ✅ Thay Color.White
             ) {
                 Row(
                     modifier = Modifier
@@ -243,7 +238,6 @@ fun HomeScreen(navController: NavController) {
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Notifications Button
                     BottomNavItem(
                         icon = Icons.Default.Notifications,
                         label = "Thông báo",
@@ -251,13 +245,12 @@ fun HomeScreen(navController: NavController) {
                         onClick = { navController.navigate("notifications") }
                     )
 
-                    // Add Post Button - Nút chính giữa đặc biệt
                     Box(
                         modifier = Modifier
                             .size(56.dp)
                             .shadow(4.dp, CircleShape)
                             .background(
-                                Color(0xFF007AFF),
+                                MaterialTheme.colorScheme.primary, // ✅ Thay Color(0xFF007AFF)
                                 CircleShape
                             )
                             .clickable { navController.navigate("compose_post") },
@@ -266,12 +259,11 @@ fun HomeScreen(navController: NavController) {
                         Icon(
                             Icons.Default.Add,
                             contentDescription = "Add Post",
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onPrimary, // ✅ Thay Color.White
                             modifier = Modifier.size(28.dp)
                         )
                     }
 
-                    // Home Button
                     BottomNavItem(
                         icon = Icons.Default.Home,
                         label = "Trang chủ",
@@ -282,11 +274,10 @@ fun HomeScreen(navController: NavController) {
             }
         }
     ) { paddingValues ->
-        // Content area với background gradient nhẹ
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFFAFAFA))
+                .background(MaterialTheme.colorScheme.background) // ✅ Thay Color(0xFFFAFAFA)
         ) {
             if (isLoading) {
                 Box(
@@ -294,7 +285,7 @@ fun HomeScreen(navController: NavController) {
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
-                        color = Color(0xFF007AFF),
+                        color = MaterialTheme.colorScheme.primary, // ✅ Thay Color(0xFF007AFF)
                         strokeWidth = 3.dp
                     )
                 }
@@ -307,7 +298,7 @@ fun HomeScreen(navController: NavController) {
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     items(posts) { post ->
-                        PostItem(post = post, navController = navController) // THÊM navController
+                        PostItem(post = post, navController = navController)
                     }
                 }
             }
@@ -317,7 +308,7 @@ fun HomeScreen(navController: NavController) {
 
 @Composable
 fun BottomNavItem(
-    icon: ImageVector,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     isSelected: Boolean,
     onClick: () -> Unit
@@ -332,7 +323,8 @@ fun BottomNavItem(
             modifier = Modifier
                 .size(40.dp)
                 .background(
-                    if (isSelected) Color(0xFF007AFF).copy(alpha = 0.1f) else Color.Transparent,
+                    if (isSelected) MaterialTheme.colorScheme.primaryContainer // ✅ Thay Color(0xFF007AFF).copy()
+                    else androidx.compose.ui.graphics.Color.Transparent,
                     RoundedCornerShape(20.dp)
                 ),
             contentAlignment = Alignment.Center
@@ -340,7 +332,8 @@ fun BottomNavItem(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (isSelected) Color(0xFF007AFF) else Color.Gray,
+                tint = if (isSelected) MaterialTheme.colorScheme.primary // ✅ Thay Color(0xFF007AFF)
+                else MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thay Color.Gray
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -350,14 +343,16 @@ fun BottomNavItem(
         Text(
             text = label,
             fontSize = 10.sp,
-            color = if (isSelected) Color(0xFF007AFF) else Color.Gray,
+            color = if (isSelected) MaterialTheme.colorScheme.primary // ✅ Thay Color(0xFF007AFF)
+            else MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thay Color.Gray
             fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
         )
     }
 }
 
 @Composable
-fun PostItem(post: Post, navController: NavController) { // THÊM navController parameter
+fun PostItem(post: Post, navController: NavController) {
+    // GIỮ NGUYÊN TẤT CẢ FIREBASE LOGIC LIKE/UNLIKE CỦA BẠN
     var isLiked by remember { mutableStateOf(post.likedBy.contains(Firebase.auth.currentUser?.uid)) }
     var likeCount by remember { mutableStateOf(post.likes) }
     var showComments by remember { mutableStateOf(false) }
@@ -386,7 +381,6 @@ fun PostItem(post: Post, navController: NavController) { // THÊM navController 
                     )
                 ).await()
 
-                // Tạo notification nếu like (không phải unlike)
                 if (!isLiked && post.authorId != currentUser.uid) {
                     val currentUserProfile = UserRepository.getCurrentUserProfile()
                     if (currentUserProfile != null) {
@@ -424,13 +418,15 @@ fun PostItem(post: Post, navController: NavController) { // THÊM navController 
         context.startActivity(android.content.Intent.createChooser(shareIntent, "Chia sẻ bài viết"))
     }
 
-    // Post Card với shadow và border radius đẹp
+    // CHỈ SỬA COLORS, GIỮ NGUYÊN LAYOUT
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface // ✅ Thay Color.White
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -438,7 +434,7 @@ fun PostItem(post: Post, navController: NavController) { // THÊM navController 
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Author info - THÊM NAVIGATION KHI CLICK AVATAR
+            // Author info
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -448,7 +444,7 @@ fun PostItem(post: Post, navController: NavController) { // THÊM navController 
                         .size(44.dp)
                         .shadow(1.dp, CircleShape)
                         .clickable {
-                            navController.navigate("profile/${post.authorId}") // THÊM NAVIGATION
+                            navController.navigate("profile/${post.authorId}")
                         }
                 ) {
                     AsyncImage(
@@ -457,7 +453,7 @@ fun PostItem(post: Post, navController: NavController) { // THÊM navController 
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(CircleShape)
-                            .background(Color.Gray.copy(alpha = 0.2f)),
+                            .background(MaterialTheme.colorScheme.surfaceVariant), // ✅ Thay Color.Gray.copy()
                         placeholder = painterResource(id = R.drawable.logomacdinh)
                     )
                 }
@@ -469,27 +465,26 @@ fun PostItem(post: Post, navController: NavController) { // THÊM navController 
                         text = post.author,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
-                        color = Color(0xFF1A1A1A),
+                        color = MaterialTheme.colorScheme.onSurface, // ✅ Thay Color(0xFF1A1A1A)
                         modifier = Modifier.clickable {
-                            navController.navigate("profile/${post.authorId}") // THÊM NAVIGATION
+                            navController.navigate("profile/${post.authorId}")
                         }
                     )
                     Text(
                         text = post.time,
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant // ✅ Thay Color.Gray
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Content
             Text(
                 text = post.content,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
-                color = Color(0xFF333333)
+                color = MaterialTheme.colorScheme.onSurface // ✅ Thay Color(0xFF333333)
             )
 
             // Images
@@ -513,12 +508,11 @@ fun PostItem(post: Post, navController: NavController) { // THÊM navController 
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Action buttons với design đẹp hơn
+            // Action buttons
             Row(
                 horizontalArrangement = Arrangement.spacedBy(32.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Like button
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { toggleLike() }
@@ -526,7 +520,8 @@ fun PostItem(post: Post, navController: NavController) { // THÊM navController 
                     Icon(
                         imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = "Like",
-                        tint = if (isLiked) Color.Red else Color.Gray,
+                        tint = if (isLiked) MaterialTheme.colorScheme.error // ✅ Thay Color.Red
+                        else MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thay Color.Gray
                         modifier = Modifier.size(22.dp)
                     )
                     if (likeCount > 0) {
@@ -534,13 +529,12 @@ fun PostItem(post: Post, navController: NavController) { // THÊM navController 
                         Text(
                             text = likeCount.toString(),
                             fontSize = 13.sp,
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thay Color.Gray
                             fontWeight = FontWeight.Medium
                         )
                     }
                 }
 
-                // Comment button
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { showComments = !showComments }
@@ -549,38 +543,35 @@ fun PostItem(post: Post, navController: NavController) { // THÊM navController 
                         painter = painterResource(id = R.drawable.iconbinhluan),
                         contentDescription = "Comment",
                         modifier = Modifier.size(22.dp),
-                        tint = Color.Gray
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant // ✅ Thay Color.Gray
                     )
                     if (post.comments > 0) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = post.comments.toString(),
                             fontSize = 13.sp,
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thay Color.Gray
                             fontWeight = FontWeight.Medium
                         )
                     }
                 }
 
-                // Share button
                 Icon(
                     painter = painterResource(id = R.drawable.iconchiase),
                     contentDescription = "Share",
                     modifier = Modifier
                         .size(22.dp)
                         .clickable { sharePost() },
-                    tint = Color.Gray
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant // ✅ Thay Color.Gray
                 )
             }
 
-            // Comments section
             if (showComments) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Divider(color = Color.Gray.copy(alpha = 0.3f))
+                Divider(color = MaterialTheme.colorScheme.outline) // ✅ Thay Color.Gray.copy()
                 Spacer(modifier = Modifier.height(8.dp))
                 CommentSection(postId = post.id)
             }
         }
     }
 }
-
