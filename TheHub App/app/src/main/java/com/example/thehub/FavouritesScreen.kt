@@ -38,6 +38,14 @@ fun FavouritesScreen(navController: NavController) {
     val currentUser = Firebase.auth.currentUser
     val db = Firebase.firestore
 
+    // Theme-aware colors
+    val backgroundColor = ThemeManager.getBackgroundColor()
+    val surfaceColor = ThemeManager.getSurfaceColor()
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+    val iconColor = ThemeManager.getIconColor()
+    val accentColor = ThemeManager.getAccentColor()
+
     // Load liked posts
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
@@ -141,16 +149,21 @@ fun FavouritesScreen(navController: NavController) {
                     Text(
                         "Bài viết đã thích",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
+                        fontSize = 20.sp,
+                        color = textColor
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = textColor
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = surfaceColor
                 )
             )
         }
@@ -159,7 +172,7 @@ fun FavouritesScreen(navController: NavController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFFFAFAFA))
+                .background(backgroundColor)
         ) {
             when {
                 isLoading -> {
@@ -167,7 +180,7 @@ fun FavouritesScreen(navController: NavController) {
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = Color(0xFF007AFF))
+                        CircularProgressIndicator(color = accentColor)
                     }
                 }
 
@@ -185,12 +198,12 @@ fun FavouritesScreen(navController: NavController) {
                             text = "Không thể tải bài viết",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1A1A1A)
+                            color = textColor
                         )
                         Text(
                             text = errorMessage,
                             fontSize = 14.sp,
-                            color = Color(0xFF666666),
+                            color = secondaryTextColor,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 8.dp)
                         )
@@ -198,7 +211,7 @@ fun FavouritesScreen(navController: NavController) {
                         Button(
                             onClick = { retryLoadLikedPosts() },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF007AFF)
+                                containerColor = accentColor
                             )
                         ) {
                             Text("Thử lại")
@@ -218,7 +231,7 @@ fun FavouritesScreen(navController: NavController) {
                             Icons.Default.Favorite,
                             contentDescription = "No Likes",
                             modifier = Modifier.size(64.dp),
-                            tint = Color(0xFFE0E0E0)
+                            tint = iconColor.copy(alpha = 0.6f)
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -227,14 +240,14 @@ fun FavouritesScreen(navController: NavController) {
                             text = "Chưa có bài viết nào được thích",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF1A1A1A),
+                            color = textColor,
                             textAlign = TextAlign.Center
                         )
 
                         Text(
                             text = "Hãy thích những bài viết yêu thích để xem lại sau",
                             fontSize = 14.sp,
-                            color = Color(0xFF666666),
+                            color = secondaryTextColor,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 8.dp)
                         )

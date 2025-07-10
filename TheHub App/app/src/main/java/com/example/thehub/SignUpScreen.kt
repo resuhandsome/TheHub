@@ -39,6 +39,12 @@ fun SignUpScreen(navController: NavController) {
     val auth = Firebase.auth
     val db = Firebase.firestore
 
+    // Theme-aware colors
+    val backgroundColor = ThemeManager.getBackgroundColor()
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+    val accentColor = ThemeManager.getAccentColor()
+
     fun signUp() {
         if (username.isBlank()) {
             Toast.makeText(context, "Vui lòng nhập username", Toast.LENGTH_SHORT).show()
@@ -119,7 +125,7 @@ fun SignUpScreen(navController: NavController) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(backgroundColor)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -136,7 +142,8 @@ fun SignUpScreen(navController: NavController) {
         Text(
             text = "Tạo tài khoản",
             fontSize = 24.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            color = textColor
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -145,12 +152,21 @@ fun SignUpScreen(navController: NavController) {
         TextField(
             value = username,
             onValueChange = { username = it },
-            label = { Text("Username") },
+            label = {
+                Text(
+                    "Username",
+                    color = secondaryTextColor
+                )
+            },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
             colors = TextFieldDefaults.colors(
                 focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
+                unfocusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
+                focusedTextColor = textColor,
+                unfocusedTextColor = textColor
             )
         )
 
@@ -160,13 +176,22 @@ fun SignUpScreen(navController: NavController) {
         TextField(
             value = email,
             onValueChange = { email = it },
-            label = { Text("Email") },
+            label = {
+                Text(
+                    "Email",
+                    color = secondaryTextColor
+                )
+            },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
             colors = TextFieldDefaults.colors(
                 focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
+                unfocusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
+                focusedTextColor = textColor,
+                unfocusedTextColor = textColor
             )
         )
 
@@ -176,13 +201,22 @@ fun SignUpScreen(navController: NavController) {
         TextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Mật khẩu") },
+            label = {
+                Text(
+                    "Mật khẩu",
+                    color = secondaryTextColor
+                )
+            },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
             colors = TextFieldDefaults.colors(
                 focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
+                unfocusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
+                focusedTextColor = textColor,
+                unfocusedTextColor = textColor
             )
         )
 
@@ -192,13 +226,22 @@ fun SignUpScreen(navController: NavController) {
         TextField(
             value = confirmPassword,
             onValueChange = { confirmPassword = it },
-            label = { Text("Xác nhận mật khẩu") },
+            label = {
+                Text(
+                    "Xác nhận mật khẩu",
+                    color = secondaryTextColor
+                )
+            },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
             colors = TextFieldDefaults.colors(
                 focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
+                unfocusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
+                focusedTextColor = textColor,
+                unfocusedTextColor = textColor
             )
         )
 
@@ -211,7 +254,8 @@ fun SignUpScreen(navController: NavController) {
                 .fillMaxWidth()
                 .height(50.dp),
             enabled = !isLoading,
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = accentColor)
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
@@ -229,7 +273,10 @@ fun SignUpScreen(navController: NavController) {
         TextButton(
             onClick = { navController.navigate("login") }
         ) {
-            Text("Đã có tài khoản? Đăng nhập")
+            Text(
+                "Đã có tài khoản? Đăng nhập",
+                color = accentColor
+            )
         }
     }
 }

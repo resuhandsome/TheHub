@@ -49,7 +49,6 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
     var selectedTab by remember { mutableStateOf("Posts") }
     var isFollowLoading by remember { mutableStateOf(false) }
 
-    // STATE CHO FOLLOWER COUNTS - QUAN TRỌNG
     var followersCount by remember { mutableStateOf(0) }
     var followingCount by remember { mutableStateOf(0) }
 
@@ -59,15 +58,22 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
     val db = Firebase.firestore
     val isOwnProfile = userId == null || userId == currentUser?.uid
 
-    // FUNCTION LOAD PROFILE DATA
+    // Theme-aware colors
+    val backgroundColor = ThemeManager.getBackgroundColor()
+    val surfaceColor = ThemeManager.getSurfaceColor()
+    val cardColor = ThemeManager.getCardColor()
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+    val iconColor = ThemeManager.getIconColor()
+    val dividerColor = ThemeManager.getDividerColor()
+    val accentColor = ThemeManager.getAccentColor()
+
     suspend fun loadProfileData() {
         try {
             val targetUserId = userId ?: currentUser?.uid
             if (targetUserId != null) {
-                // Load user profile
                 userProfile = UserRepository.getUserProfile(targetUserId)
 
-                // Load real-time follower counts từ follows collection
                 val followersSnapshot = db.collection("follows")
                     .whereEqualTo("followingId", targetUserId)
                     .get()
@@ -78,11 +84,9 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                     .get()
                     .await()
 
-                // CẬP NHẬT STATE VỚI SỐ THỰC TẾ
                 followersCount = followersSnapshot.size()
                 followingCount = followingSnapshot.size()
 
-                // Cập nhật user profile với số thực tế
                 if (userProfile != null) {
                     val updatedProfile = userProfile!!.copy(
                         followersCount = followersCount,
@@ -92,7 +96,6 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                     userProfile = updatedProfile
                 }
 
-                // Load posts
                 val postsSnapshot = db.collection("posts")
                     .whereEqualTo("authorId", targetUserId)
                     .get()
@@ -118,7 +121,6 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                     }
                 }.sortedByDescending { it.timestamp }
 
-                // Check following status
                 if (!isOwnProfile && currentUser != null && targetUserId != currentUser.uid) {
                     val followDoc = db.collection("follows")
                         .whereEqualTo("followerId", currentUser.uid)
@@ -128,23 +130,18 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
 
                     isFollowing = !followDoc.isEmpty
                 }
-
-                println("DEBUG: Loaded profile - Followers: $followersCount, Following: $followingCount")
             }
         } catch (e: Exception) {
             Toast.makeText(context, "Lỗi khi tải profile: ${e.message}", Toast.LENGTH_SHORT).show()
-            println("DEBUG: Error loading profile - ${e.message}")
         }
     }
 
-    // Load data khi component mount
     LaunchedEffect(userId, currentUser) {
         isLoading = true
         loadProfileData()
         isLoading = false
     }
 
-    // FUNCTION TOGGLE FOLLOW VỚI LOGIC HOÀN CHỈNH
     fun toggleFollow() {
         if (currentUser == null || userProfile == null || isFollowLoading) return
 
@@ -154,10 +151,6 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                 val targetUserId = userProfile!!.uid
 
                 if (isFollowing) {
-                    // UNFOLLOW PROCESS
-                    println("DEBUG: Starting unfollow process")
-
-                    // 1. Xóa follow record
                     val followDocs = db.collection("follows")
                         .whereEqualTo("followerId", currentUser.uid)
                         .whereEqualTo("followingId", targetUserId)
@@ -168,10 +161,8 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                         db.collection("follows").document(doc.id).delete().await()
                     }
 
-                    // 2. Cập nhật counts ngay lập tức
                     followersCount = maxOf(0, followersCount - 1)
 
-                    // 3. Cập nhật database
                     db.collection("users").document(targetUserId)
                         .update("followersCount", followersCount).await()
 
@@ -183,17 +174,10 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                             .update("followingCount", newFollowing).await()
                     }
 
-                    // 4. Cập nhật UI state
                     isFollowing = false
-
                     Toast.makeText(context, "Đã hủy theo dõi", Toast.LENGTH_SHORT).show()
-                    println("DEBUG: Unfollow completed - New followers count: $followersCount")
 
                 } else {
-                    // FOLLOW PROCESS
-                    println("DEBUG: Starting follow process")
-
-                    // 1. Tạo follow record
                     val followData = hashMapOf(
                         "followerId" to currentUser.uid,
                         "followingId" to targetUserId,
@@ -202,10 +186,8 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
 
                     db.collection("follows").add(followData).await()
 
-                    // 2. Cập nhật counts ngay lập tức
                     followersCount += 1
 
-                    // 3. Cập nhật database
                     db.collection("users").document(targetUserId)
                         .update("followersCount", followersCount).await()
 
@@ -217,7 +199,6 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                             .update("followingCount", newFollowing).await()
                     }
 
-                    // 4. Tạo notification
                     val currentUserProfile = UserRepository.getCurrentUserProfile()
                     if (currentUserProfile != null) {
                         val notificationData = hashMapOf(
@@ -234,19 +215,14 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                         db.collection("notifications").add(notificationData).await()
                     }
 
-                    // 5. Cập nhật UI state
                     isFollowing = true
-
                     Toast.makeText(context, "Đã theo dõi", Toast.LENGTH_SHORT).show()
-                    println("DEBUG: Follow completed - New followers count: $followersCount")
                 }
 
-                // 6. Refresh profile để đảm bảo consistency
                 loadProfileData()
 
             } catch (e: Exception) {
                 Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_SHORT).show()
-                println("DEBUG: Error in toggleFollow - ${e.message}")
             } finally {
                 isFollowLoading = false
             }
@@ -260,27 +236,40 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                     Text(
                         text = userProfile?.username ?: "Profile",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
+                        fontSize = 20.sp,
+                        color = textColor
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = textColor
+                        )
                     }
                 },
                 actions = {
                     if (isOwnProfile) {
                         IconButton(onClick = { navController.navigate("settings") }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = textColor
+                            )
                         }
                     } else {
                         IconButton(onClick = { /* TODO: More options */ }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "More",
+                                tint = textColor
+                            )
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = surfaceColor
                 )
             )
         }
@@ -290,14 +279,14 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = Color(0xFF007AFF))
+                CircularProgressIndicator(color = accentColor)
             }
         } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .background(Color(0xFFFAFAFA))
+                    .background(backgroundColor)
             ) {
                 item {
                     ProfileHeader(
@@ -313,11 +302,10 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                 }
 
                 item {
-                    // SỬ DỤNG STATE COUNTS THAY VÌ USERPROFILE
                     ProfileStats(
                         postsCount = userPosts.size,
-                        followersCount = followersCount, // SỬ DỤNG STATE
-                        followingCount = followingCount  // SỬ DỤNG STATE
+                        followersCount = followersCount,
+                        followingCount = followingCount
                     )
                 }
 
@@ -365,19 +353,23 @@ fun ProfileHeader(
     onFollowClick: () -> Unit,
     onEditClick: () -> Unit
 ) {
+    val cardColor = ThemeManager.getCardColor()
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+    val accentColor = ThemeManager.getAccentColor()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Avatar
             Box(
                 modifier = Modifier
                     .size(120.dp)
@@ -390,7 +382,7 @@ fun ProfileHeader(
                         .fillMaxSize()
                         .clip(CircleShape)
                         .background(Color.Gray.copy(alpha = 0.3f))
-                        .border(4.dp, Color.White, CircleShape),
+                        .border(4.dp, cardColor, CircleShape),
                     contentScale = ContentScale.Crop,
                     placeholder = painterResource(id = R.drawable.logomacdinh)
                 )
@@ -398,26 +390,24 @@ fun ProfileHeader(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Username
             Text(
                 text = userProfile?.username ?: "Unknown User",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A)
+                color = textColor
             )
 
             if (!userProfile?.displayName.isNullOrBlank() && userProfile?.displayName != userProfile?.username) {
                 Text(
                     text = userProfile?.displayName ?: "",
                     fontSize = 16.sp,
-                    color = Color(0xFF666666),
+                    color = secondaryTextColor,
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Action Buttons
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -425,7 +415,7 @@ fun ProfileHeader(
                     Button(
                         onClick = onEditClick,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF007AFF)
+                            containerColor = accentColor
                         ),
                         shape = RoundedCornerShape(24.dp),
                         modifier = Modifier
@@ -449,7 +439,7 @@ fun ProfileHeader(
                         onClick = onFollowClick,
                         enabled = !isFollowLoading,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isFollowing) Color(0xFFE0E0E0) else Color(0xFF007AFF)
+                            containerColor = if (isFollowing) Color(0xFFE0E0E0) else accentColor
                         ),
                         shape = RoundedCornerShape(24.dp),
                         modifier = Modifier
@@ -467,7 +457,7 @@ fun ProfileHeader(
                                 text = if (isFollowing) "Đang theo dõi" else "Theo dõi",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = if (isFollowing) Color(0xFF666666) else Color.White
+                                color = if (isFollowing) secondaryTextColor else Color.White
                             )
                         }
                     }
@@ -478,13 +468,13 @@ fun ProfileHeader(
                         modifier = Modifier
                             .height(48.dp)
                             .weight(1f),
-                        border = BorderStroke(1.dp, Color(0xFF007AFF))
+                        border = BorderStroke(1.dp, accentColor)
                     ) {
                         Text(
                             "Nhắn tin",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF007AFF)
+                            color = accentColor
                         )
                     }
                 }
@@ -499,12 +489,17 @@ fun ProfileStats(
     followersCount: Int,
     followingCount: Int
 ) {
+    val cardColor = ThemeManager.getCardColor()
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+    val dividerColor = ThemeManager.getDividerColor()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -516,12 +511,12 @@ fun ProfileStats(
             StatItem(count = postsCount, label = "Bài viết")
             Divider(
                 modifier = Modifier.height(40.dp).width(1.dp),
-                color = Color(0xFFE0E0E0)
+                color = dividerColor
             )
             StatItem(count = followersCount, label = "Người theo dõi")
             Divider(
                 modifier = Modifier.height(40.dp).width(1.dp),
-                color = Color(0xFFE0E0E0)
+                color = dividerColor
             )
             StatItem(count = followingCount, label = "Đang theo dõi")
         }
@@ -530,36 +525,42 @@ fun ProfileStats(
 
 @Composable
 fun StatItem(count: Int, label: String) {
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = count.toString(),
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF1A1A1A)
+            color = textColor
         )
         Text(
             text = label,
             fontSize = 14.sp,
-            color = Color(0xFF666666)
+            color = secondaryTextColor
         )
     }
 }
 
 @Composable
 fun ProfileBio(bio: String) {
+    val cardColor = ThemeManager.getCardColor()
+    val textColor = ThemeManager.getTextColor()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Text(
             text = bio,
             fontSize = 14.sp,
             lineHeight = 20.sp,
-            color = Color(0xFF333333),
+            color = textColor,
             modifier = Modifier.padding(20.dp)
         )
     }
@@ -571,13 +572,17 @@ fun ProfileTabs(
     onTabSelected: (String) -> Unit
 ) {
     val tabs = listOf("Posts", "Media", "Tagged")
+    val cardColor = ThemeManager.getCardColor()
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+    val accentColor = ThemeManager.getAccentColor()
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -593,7 +598,7 @@ fun ProfileTabs(
                         .weight(1f)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
-                            if (isSelected) Color(0xFF007AFF) else Color.Transparent
+                            if (isSelected) accentColor else Color.Transparent
                         )
                         .clickable { onTabSelected(tab) }
                         .padding(vertical = 12.dp),
@@ -603,7 +608,7 @@ fun ProfileTabs(
                         text = tab,
                         fontSize = 14.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color.White else Color(0xFF666666)
+                        color = if (isSelected) Color.White else secondaryTextColor
                     )
                 }
             }
@@ -613,12 +618,14 @@ fun ProfileTabs(
 
 @Composable
 fun PostsGrid(posts: List<Post>) {
+    val cardColor = ThemeManager.getCardColor()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         LazyVerticalGrid(
@@ -637,6 +644,8 @@ fun PostsGrid(posts: List<Post>) {
 
 @Composable
 fun PostGridItem(post: Post) {
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+
     Card(
         modifier = Modifier
             .aspectRatio(1f)
@@ -655,14 +664,14 @@ fun PostGridItem(post: Post) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFF5F5F5)),
+                    .background(if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = post.content.take(50) + if (post.content.length > 50) "..." else "",
                     fontSize = 12.sp,
                     textAlign = TextAlign.Center,
-                    color = Color(0xFF666666),
+                    color = secondaryTextColor,
                     modifier = Modifier.padding(8.dp)
                 )
             }
@@ -672,12 +681,15 @@ fun PostGridItem(post: Post) {
 
 @Composable
 fun MediaGrid(posts: List<Post>) {
+    val cardColor = ThemeManager.getCardColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         if (posts.isEmpty()) {
@@ -690,7 +702,7 @@ fun MediaGrid(posts: List<Post>) {
                 Text(
                     text = "Chưa có ảnh nào",
                     fontSize = 16.sp,
-                    color = Color(0xFF666666)
+                    color = secondaryTextColor
                 )
             }
         } else {
@@ -718,12 +730,15 @@ fun MediaGrid(posts: List<Post>) {
 
 @Composable
 fun TaggedSection() {
+    val cardColor = ThemeManager.getCardColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Box(
@@ -735,7 +750,7 @@ fun TaggedSection() {
             Text(
                 text = "Chưa có bài viết được gắn thẻ",
                 fontSize = 16.sp,
-                color = Color(0xFF666666)
+                color = secondaryTextColor
             )
         }
     }
@@ -743,12 +758,16 @@ fun TaggedSection() {
 
 @Composable
 fun EmptyPostsSection(isOwnProfile: Boolean) {
+    val cardColor = ThemeManager.getCardColor()
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -763,17 +782,16 @@ fun EmptyPostsSection(isOwnProfile: Boolean) {
                 text = if (isOwnProfile) "Chưa có bài viết nào" else "Người dùng chưa có bài viết",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF1A1A1A),
+                color = textColor,
                 textAlign = TextAlign.Center
             )
             Text(
                 text = if (isOwnProfile) "Hãy tạo bài viết đầu tiên của bạn!" else "Hãy quay lại sau nhé!",
                 fontSize = 14.sp,
-                color = Color(0xFF666666),
+                color = secondaryTextColor,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp)
             )
         }
     }
 }
-

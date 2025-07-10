@@ -56,6 +56,14 @@ fun NotificationsScreen(navController: NavController) {
     val currentUser = Firebase.auth.currentUser
     val db = Firebase.firestore
 
+    // Theme-aware colors
+    val backgroundColor = ThemeManager.getBackgroundColor()
+    val surfaceColor = ThemeManager.getSurfaceColor()
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+    val accentColor = ThemeManager.getAccentColor()
+    val dividerColor = ThemeManager.getDividerColor()
+
     // Load notifications với error handling tốt hơn
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
@@ -194,16 +202,21 @@ fun NotificationsScreen(navController: NavController) {
                     Text(
                         "Thông báo",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
+                        fontSize = 20.sp,
+                        color = textColor
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = textColor
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = surfaceColor
                 )
             )
         }
@@ -212,7 +225,7 @@ fun NotificationsScreen(navController: NavController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color.White)
+                .background(backgroundColor)
         ) {
             // Tab buttons
             Row(
@@ -228,19 +241,19 @@ fun NotificationsScreen(navController: NavController) {
                             Text(
                                 tab,
                                 fontSize = 14.sp,
-                                color = if (selectedTab == tab) Color.White else Color.Gray
+                                color = if (selectedTab == tab) Color.White else secondaryTextColor
                             )
                         },
                         selected = selectedTab == tab,
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFF007AFF),
-                            containerColor = Color(0xFFF0F0F0)
+                            selectedContainerColor = accentColor,
+                            containerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF0F0F0)
                         )
                     )
                 }
             }
 
-            Divider(color = Color(0xFFE0E0E0), thickness = 0.5.dp)
+            Divider(color = dividerColor, thickness = 0.5.dp)
 
             // Content area
             when {
@@ -249,7 +262,7 @@ fun NotificationsScreen(navController: NavController) {
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = Color(0xFF007AFF))
+                        CircularProgressIndicator(color = accentColor)
                     }
                 }
 
@@ -268,19 +281,19 @@ fun NotificationsScreen(navController: NavController) {
                             text = "Không thể tải thông báo",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1A1A1A)
+                            color = textColor
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = errorMessage,
                             fontSize = 14.sp,
-                            color = Color(0xFF666666)
+                            color = secondaryTextColor
                         )
                         Spacer(modifier = Modifier.height(24.dp))
                         Button(
                             onClick = { retryLoadNotifications() },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF007AFF)
+                                containerColor = accentColor
                             )
                         ) {
                             Text("Thử lại")
@@ -303,12 +316,12 @@ fun NotificationsScreen(navController: NavController) {
                                 text = "Chưa có thông báo nào",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFF1A1A1A)
+                                color = textColor
                             )
                             Text(
                                 text = "Thông báo sẽ xuất hiện ở đây",
                                 fontSize = 14.sp,
-                                color = Color(0xFF666666)
+                                color = secondaryTextColor
                             )
                         }
                     }
@@ -353,6 +366,11 @@ fun NotificationItemView(
     val currentUser = Firebase.auth.currentUser
     val db = Firebase.firestore
     val coroutineScope = rememberCoroutineScope()
+
+    // Theme-aware colors
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+    val accentColor = ThemeManager.getAccentColor()
 
     // Check if already following
     LaunchedEffect(notification.fromUserId) {
@@ -401,7 +419,7 @@ fun NotificationItemView(
                     text = notification.fromUsername,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    color = Color.Black
+                    color = textColor
                 )
 
                 Spacer(modifier = Modifier.width(4.dp))
@@ -409,7 +427,7 @@ fun NotificationItemView(
                 Text(
                     text = getNotificationMessage(notification.type),
                     fontSize = 14.sp,
-                    color = Color.Black
+                    color = textColor
                 )
             }
 
@@ -418,7 +436,7 @@ fun NotificationItemView(
             Text(
                 text = formatTime(notification.timestamp),
                 fontSize = 12.sp,
-                color = Color.Gray
+                color = secondaryTextColor
             )
         }
 
@@ -431,7 +449,9 @@ fun NotificationItemView(
                         isFollowing = !isFollowing
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isFollowing) Color(0xFFE0E0E0) else Color(0xFF007AFF)
+                        containerColor = if (isFollowing)
+                            if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFE0E0E0)
+                        else accentColor
                     ),
                     shape = RoundedCornerShape(20.dp),
                     modifier = Modifier
@@ -442,7 +462,7 @@ fun NotificationItemView(
                     Text(
                         text = if (isFollowing) "Đang theo dõi" else "Theo dõi",
                         fontSize = 12.sp,
-                        color = if (isFollowing) Color.Gray else Color.White,
+                        color = if (isFollowing) secondaryTextColor else Color.White,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -452,7 +472,10 @@ fun NotificationItemView(
                 Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .background(Color(0xFFF0F0F0), RoundedCornerShape(8.dp)),
+                        .background(
+                            if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF0F0F0),
+                            RoundedCornerShape(8.dp)
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -462,7 +485,7 @@ fun NotificationItemView(
                         ),
                         contentDescription = "Post",
                         modifier = Modifier.size(20.dp),
-                        tint = Color.Gray
+                        tint = secondaryTextColor
                     )
                 }
             }

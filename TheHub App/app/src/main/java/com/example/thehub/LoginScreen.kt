@@ -57,6 +57,12 @@ fun LoginScreen(navController: NavController) {
     val db = Firebase.firestore
     val scrollState = rememberScrollState()
 
+    // Theme-aware colors
+    val backgroundColor = ThemeManager.getBackgroundColor()
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+    val accentColor = ThemeManager.getAccentColor()
+
     // Load saved credentials khi khởi tạo
     LaunchedEffect(Unit) {
         val savedCredentials = UserPreferences.getSavedCredentials(context)
@@ -135,7 +141,7 @@ fun LoginScreen(navController: NavController) {
         }
     }
 
-    // LOGIC LƯU TÀI KHOẢN - TỰ ĐỘNG XÓA KHI BỎ TICK
+    //LƯU TÀI KHOẢN
     fun handleRememberLoginChange(newValue: Boolean) {
         rememberLogin = newValue
         if (!newValue) {
@@ -230,7 +236,7 @@ fun LoginScreen(navController: NavController) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(backgroundColor)
             .verticalScroll(scrollState)
             .padding(horizontal = 32.dp)
             .imePadding(),
@@ -253,7 +259,7 @@ fun LoginScreen(navController: NavController) {
             text = "Đăng nhập vào TheHub",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.Black
+            color = textColor
         )
 
         Spacer(modifier = Modifier.height(40.dp))
@@ -262,12 +268,23 @@ fun LoginScreen(navController: NavController) {
         OutlinedTextField(
             value = username,
             onValueChange = { username = it },
-            label = { Text("Username") },
+            label = {
+                Text(
+                    "Username",
+                    color = secondaryTextColor
+                )
+            },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
             enabled = !isLoading && !isGoogleLoading,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-            singleLine = true
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = textColor,
+                unfocusedTextColor = textColor,
+                focusedBorderColor = accentColor,
+                unfocusedBorderColor = secondaryTextColor.copy(alpha = 0.5f)
+            )
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -276,28 +293,38 @@ fun LoginScreen(navController: NavController) {
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Mật khẩu") },
+            label = {
+                Text(
+                    "Mật khẩu",
+                    color = secondaryTextColor
+                )
+            },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
             enabled = !isLoading && !isGoogleLoading,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            singleLine = true
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = textColor,
+                unfocusedTextColor = textColor,
+                focusedBorderColor = accentColor,
+                unfocusedBorderColor = secondaryTextColor.copy(alpha = 0.5f)
+            )
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Remember Login Checkbox - ĐÃ XÓA NÚT "XÓA ĐÃ LƯU"
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
                 checked = rememberLogin,
-                onCheckedChange = { handleRememberLoginChange(it) }, // Sử dụng function mới
+                onCheckedChange = { handleRememberLoginChange(it) },
                 enabled = !isLoading && !isGoogleLoading,
                 colors = CheckboxDefaults.colors(
-                    checkedColor = Color(0xFF007AFF)
+                    checkedColor = accentColor
                 )
             )
 
@@ -306,10 +333,8 @@ fun LoginScreen(navController: NavController) {
             Text(
                 text = "Lưu tài khoản",
                 fontSize = 14.sp,
-                color = Color(0xFF666666)
+                color = secondaryTextColor
             )
-
-            // ĐÃ XÓA NÚT "XÓA ĐÃ LƯU" - Logic tự động xóa khi bỏ tick
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -321,24 +346,32 @@ fun LoginScreen(navController: NavController) {
                 .fillMaxWidth()
                 .height(50.dp),
             shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
+            colors = ButtonDefaults.buttonColors(containerColor = textColor),
             enabled = !isLoading && !isGoogleLoading
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
-                    color = Color.White,
+                    color = backgroundColor,
                     strokeWidth = 2.dp
                 )
             } else {
-                Text(text = "ĐĂNG NHẬP", color = Color.White, fontSize = 16.sp)
+                Text(
+                    text = "ĐĂNG NHẬP",
+                    color = backgroundColor,
+                    fontSize = 16.sp
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
         // Divider
-        Text(text = "hoặc", color = Color.Gray, fontSize = 14.sp)
+        Text(
+            text = "hoặc",
+            color = secondaryTextColor,
+            fontSize = 14.sp
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -371,13 +404,19 @@ fun SocialLoginButton(
     isLoading: Boolean = false,
     enabled: Boolean = true
 ) {
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+
     OutlinedButton(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .height(50.dp),
         shape = RoundedCornerShape(8.dp),
-        border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
+        border = ButtonDefaults.outlinedButtonBorder.copy(
+            width = 1.dp,
+            brush = androidx.compose.ui.graphics.SolidColor(secondaryTextColor.copy(alpha = 0.5f))
+        ),
         enabled = enabled
     ) {
         Row(
@@ -389,7 +428,7 @@ fun SocialLoginButton(
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp,
-                    color = Color.Black
+                    color = textColor
                 )
             } else {
                 Image(
@@ -401,7 +440,11 @@ fun SocialLoginButton(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                Text(text = text, color = Color.Black, fontSize = 16.sp)
+                Text(
+                    text = text,
+                    color = textColor,
+                    fontSize = 16.sp
+                )
             }
         }
     }
@@ -409,13 +452,16 @@ fun SocialLoginButton(
 
 @Composable
 fun SignUpText(navController: NavController) {
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+    val accentColor = ThemeManager.getAccentColor()
+
     val annotatedText = buildAnnotatedString {
-        withStyle(style = SpanStyle(color = Color.Gray, fontSize = 14.sp)) {
+        withStyle(style = SpanStyle(color = secondaryTextColor, fontSize = 14.sp)) {
             append("Chưa có tài khoản? ")
         }
 
         pushStringAnnotation(tag = "SignUp", annotation = "SignUp")
-        withStyle(style = SpanStyle(color = Color(0xFF0052D4), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)) {
+        withStyle(style = SpanStyle(color = accentColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)) {
             append("Đăng ký")
         }
         pop()

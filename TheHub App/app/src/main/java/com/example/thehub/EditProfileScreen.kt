@@ -56,6 +56,14 @@ fun EditProfileScreen(navController: NavController) {
     val storage = Firebase.storage
     val scrollState = rememberScrollState()
 
+    // Theme-aware colors
+    val backgroundColor = ThemeManager.getBackgroundColor()
+    val surfaceColor = ThemeManager.getSurfaceColor()
+    val cardColor = ThemeManager.getCardColor()
+    val textColor = ThemeManager.getTextColor()
+    val secondaryTextColor = ThemeManager.getSecondaryTextColor()
+    val accentColor = ThemeManager.getAccentColor()
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -141,12 +149,17 @@ fun EditProfileScreen(navController: NavController) {
                     Text(
                         "Chỉnh sửa profile",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
+                        fontSize = 20.sp,
+                        color = textColor
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = textColor
+                        )
                     }
                 },
                 actions = {
@@ -157,19 +170,20 @@ fun EditProfileScreen(navController: NavController) {
                         if (isSaving) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp
+                                strokeWidth = 2.dp,
+                                color = accentColor
                             )
                         } else {
                             Text(
                                 "Lưu",
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF007AFF)
+                                color = accentColor
                             )
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = surfaceColor
                 )
             )
         }
@@ -179,14 +193,14 @@ fun EditProfileScreen(navController: NavController) {
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = Color(0xFF007AFF))
+                CircularProgressIndicator(color = accentColor)
             }
         } else {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .background(Color(0xFFFAFAFA))
+                    .background(backgroundColor)
                     .verticalScroll(scrollState)
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -195,7 +209,7 @@ fun EditProfileScreen(navController: NavController) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = cardColor),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
                     Column(
@@ -218,7 +232,7 @@ fun EditProfileScreen(navController: NavController) {
                                         .fillMaxSize()
                                         .clip(CircleShape)
                                         .background(Color.Gray.copy(alpha = 0.3f))
-                                        .border(4.dp, Color.White, CircleShape),
+                                        .border(4.dp, cardColor, CircleShape),
                                     contentScale = ContentScale.Crop,
                                     placeholder = painterResource(id = R.drawable.logomacdinh)
                                 )
@@ -229,7 +243,7 @@ fun EditProfileScreen(navController: NavController) {
                                 modifier = Modifier
                                     .size(36.dp)
                                     .align(Alignment.BottomEnd)
-                                    .background(Color(0xFF007AFF), CircleShape)
+                                    .background(accentColor, CircleShape)
                                     .clickable { imagePickerLauncher.launch("image/*") },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -247,7 +261,7 @@ fun EditProfileScreen(navController: NavController) {
                         Text(
                             text = "Nhấn để thay đổi ảnh đại diện",
                             fontSize = 14.sp,
-                            color = Color(0xFF666666)
+                            color = secondaryTextColor
                         )
                     }
                 }
@@ -258,7 +272,7 @@ fun EditProfileScreen(navController: NavController) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = cardColor),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
                     Column(
@@ -269,7 +283,7 @@ fun EditProfileScreen(navController: NavController) {
                             text = "Username",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF1A1A1A)
+                            color = textColor
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -277,14 +291,21 @@ fun EditProfileScreen(navController: NavController) {
                         TextField(
                             value = username,
                             onValueChange = { username = it },
-                            placeholder = { Text("Nhập username") },
+                            placeholder = {
+                                Text(
+                                    "Nhập username",
+                                    color = secondaryTextColor
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFFF5F5F5),
-                                unfocusedContainerColor = Color(0xFFF5F5F5),
+                                focusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
+                                unfocusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
                                 focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedTextColor = textColor,
+                                unfocusedTextColor = textColor
                             )
                         )
 
@@ -295,7 +316,7 @@ fun EditProfileScreen(navController: NavController) {
                             text = "Tên hiển thị",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF1A1A1A)
+                            color = textColor
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -303,14 +324,21 @@ fun EditProfileScreen(navController: NavController) {
                         TextField(
                             value = displayName,
                             onValueChange = { displayName = it },
-                            placeholder = { Text("Nhập tên hiển thị") },
+                            placeholder = {
+                                Text(
+                                    "Nhập tên hiển thị",
+                                    color = secondaryTextColor
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFFF5F5F5),
-                                unfocusedContainerColor = Color(0xFFF5F5F5),
+                                focusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
+                                unfocusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
                                 focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedTextColor = textColor,
+                                unfocusedTextColor = textColor
                             )
                         )
 
@@ -321,7 +349,7 @@ fun EditProfileScreen(navController: NavController) {
                             text = "Tiểu sử",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF1A1A1A)
+                            color = textColor
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -329,16 +357,23 @@ fun EditProfileScreen(navController: NavController) {
                         TextField(
                             value = bio,
                             onValueChange = { bio = it },
-                            placeholder = { Text("Viết gì đó về bản thân...") },
+                            placeholder = {
+                                Text(
+                                    "Viết gì đó về bản thân...",
+                                    color = secondaryTextColor
+                                )
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(120.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFFF5F5F5),
-                                unfocusedContainerColor = Color(0xFFF5F5F5),
+                                focusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
+                                unfocusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
                                 focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedTextColor = textColor,
+                                unfocusedTextColor = textColor
                             ),
                             maxLines = 5
                         )
