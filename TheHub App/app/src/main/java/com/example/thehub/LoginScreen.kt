@@ -1,6 +1,8 @@
 package com.example.thehub
 
 import android.app.Activity
+import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -10,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +24,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -35,27 +39,41 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(navController: NavController) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var rememberMe by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var isGoogleLoading by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val auth = Firebase.auth
     val db = Firebase.firestore
 
-    fun navigateToHome() {
-        Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
-        navController.navigate("home") {
-            popUpTo("login") { inclusive = true }
+    // SharedPreferences để lưu tài khoản
+    val sharedPrefs = context.getSharedPreferences("login_prefs", Context.MODE_PRIVATE)
+
+    // Load saved credentials khi khởi tạo
+    LaunchedEffect(Unit) {
+        val savedUsername = sharedPrefs.getString("saved_username", "")
+        val savedPassword = sharedPrefs.getString("saved_password", "")
+        val wasRemembered = sharedPrefs.getBoolean("remember_me", false)
+
+        if (wasRemembered && !savedUsername.isNullOrEmpty()) {
+            username = savedUsername
+            password = savedPassword ?: ""
+            rememberMe = true
         }
     }
 
-    //  đăng nhập google
+    // Google Sign-In Client
     val googleSignInClient = remember {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(context.getString(R.string.default_web_client_id))
@@ -64,6 +82,15 @@ fun LoginScreen(navController: NavController) {
         GoogleSignIn.getClient(context, gso)
     }
 
+    // Navigation function
+    val navigateToHome = {
+        Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
+        navController.navigate("home") {
+            popUpTo("login") { inclusive = true }
+        }
+    }
+
+    // Google Sign-In Launcher
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -73,16 +100,137 @@ fun LoginScreen(navController: NavController) {
                 val account = task.getResult(ApiException::class.java)!!
                 val idToken = account.idToken!!
                 coroutineScope.launch {
+                    isGoogleLoading = true
                     try {
                         val credential = GoogleAuthProvider.getCredential(idToken, null)
-                        auth.signInWithCredential(credential).await()
+                        val authResult = auth.signInWithCredential(credential).await()
+                        val user = authResult.user
+
+                        if (user != null) {
+                            val userProfile = UserProfile(
+                                uid = user.uid,
+                                username = user.displayName ?: "User${user.uid.take(6)}",
+                                email = user.email ?: "",
+                                displayName = user.displayName ?: "",
+                                avatarUrl = user.photoUrl?.toString() ?: "",
+                                bio = "",
+                                followersCount = 0,
+                                followingCount = 0,
+                                postsCount = 0,
+                                createdAt = System.currentTimeMillis()
+                            )
+
+                            UserRepository.updateUserProfile(userProfile)
+                        }
+
                         navigateToHome()
                     } catch (e: Exception) {
                         Log.e("FirebaseAuth", "Firebase sign-in with Google failed", e)
+                        Toast.makeText(context, "Đăng nhập Google thất bại: ${e.message}", Toast.LENGTH_SHORT).show()
+                    } finally {
+                        isGoogleLoading = false
                     }
                 }
             } catch (e: ApiException) {
                 Log.w("GoogleSignIn", "Google sign in failed", e)
+                Toast.makeText(context, "Đăng nhập Google thất bại", Toast.LENGTH_SHORT).show()
+                isGoogleLoading = false
+            }
+        } else {
+            isGoogleLoading = false
+        }
+    }
+
+    fun saveCredentials() {
+        val editor = sharedPrefs.edit()
+        if (rememberMe) {
+            editor.putString("saved_username", username)
+            editor.putString("saved_password", password)
+            editor.putBoolean("remember_me", true)
+        } else {
+            editor.remove("saved_username")
+            editor.remove("saved_password")
+            editor.putBoolean("remember_me", false)
+        }
+        editor.apply()
+    }
+
+    fun login() {
+        if (username.isBlank() || password.isBlank()) {
+            Toast.makeText(context, "Vui lòng nhập username và mật khẩu.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        coroutineScope.launch {
+            isLoading = true
+            try {
+                val trimmedUsername = username.trim()
+
+                if (Firebase.auth.app == null) {
+                    Toast.makeText(context, "Lỗi kết nối Firebase", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                val usersRef = db.collection("users")
+                val query = usersRef.whereEqualTo("username", trimmedUsername).limit(1).get().await()
+
+                if (query.isEmpty) {
+                    Toast.makeText(context, "Username không tồn tại.", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+
+                val userDoc = query.documents[0]
+                val emailForAuth = userDoc.getString("email")
+
+                if (emailForAuth != null) {
+                    auth.signInWithEmailAndPassword(emailForAuth, password.trim()).await()
+
+                    var userProfile: UserProfile? = null
+                    var retryCount = 0
+
+                    while (userProfile == null && retryCount < 3) {
+                        try {
+                            userProfile = UserRepository.getCurrentUserProfile()
+                            break
+                        } catch (e: Exception) {
+                            retryCount++
+                            if (retryCount < 3) {
+                                delay(1000)
+                            }
+                        }
+                    }
+
+                    if (userProfile != null) {
+                        val currentUser = auth.currentUser
+                        if (currentUser != null && currentUser.displayName != userProfile.username) {
+                            val profileUpdates = com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                                .setDisplayName(userProfile.username)
+                                .build()
+                            currentUser.updateProfile(profileUpdates).await()
+                        }
+
+                        // Lưu thông tin đăng nhập nếu được chọn
+                        saveCredentials()
+
+                        navigateToHome()
+                    } else {
+                        Toast.makeText(context, "Lỗi tải dữ liệu người dùng. Vui lòng thử lại.", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(context, "Lỗi dữ liệu người dùng.", Toast.LENGTH_LONG).show()
+                }
+
+            } catch (e: Exception) {
+                Log.e("LoginScreen", "Đăng nhập thất bại", e)
+                val errorMessage = when {
+                    e is FirebaseAuthInvalidCredentialsException -> "Sai mật khẩu. Vui lòng thử lại."
+                    e.message?.contains("network") == true -> "Lỗi kết nối mạng"
+                    e.message?.contains("too-many-requests") == true -> "Quá nhiều lần thử. Vui lòng đợi."
+                    else -> "Đăng nhập thất bại: Lỗi hệ thống."
+                }
+                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+            } finally {
+                isLoading = false
             }
         }
     }
@@ -95,126 +243,187 @@ fun LoginScreen(navController: NavController) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        // Logo
         Image(
             painter = painterResource(id = R.drawable.logothehub),
             contentDescription = "App Logo",
             modifier = Modifier.size(100.dp)
         )
+
         Spacer(modifier = Modifier.height(24.dp))
+
+        // Title
         Text(
-            text = "Login in to TheHub",
+            text = "Đăng nhập vào TheHub",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = Color.Black
         )
+
         Spacer(modifier = Modifier.height(40.dp))
 
-        // đầu vào của Username
+        // Username Input
         OutlinedTextField(
             value = username,
             onValueChange = { username = it },
             label = { Text("Username") },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(8.dp),
+            enabled = !isLoading && !isGoogleLoading,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+            singleLine = true
         )
+
         Spacer(modifier = Modifier.height(16.dp))
+
+        // Password Input
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Your password") },
+            label = { Text("Mật khẩu") },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(8.dp),
+            enabled = !isLoading && !isGoogleLoading,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            singleLine = true
         )
-        Spacer(modifier = Modifier.height(32.dp))
-        Text(text = "or", color = Color.Gray, fontSize = 14.sp)
+
         Spacer(modifier = Modifier.height(16.dp))
 
-        SocialLoginButton(
-            text = "Continue with Google",
-            iconResId = R.drawable.logogoogle,
-            onClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) }
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Spacer(modifier = Modifier.height(16.dp))
+        // Remember Me Checkbox - TÍNH NĂNG LƯU TÀI KHOẢN
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Checkbox(
+                checked = rememberMe,
+                onCheckedChange = { rememberMe = it },
+                enabled = !isLoading && !isGoogleLoading,
+                colors = CheckboxDefaults.colors(
+                    checkedColor = Color(0xFF007AFF)
+                )
+            )
 
-        // nhập Username/Password
-        Button(
-            onClick = {
-                if (username.isBlank() || password.isBlank()) {
-                    Toast.makeText(context, "Vui lòng nhập username và mật khẩu.", Toast.LENGTH_SHORT).show()
-                    return@Button
-                }
-                coroutineScope.launch {
-                    try {
-                        val trimmedUsername = username.trim()
+            Spacer(modifier = Modifier.width(8.dp))
 
-                        // 1. Tìm trong Firestore để lấy email đã dùng để xác thực
-                        val usersRef = db.collection("users")
-                        val query = usersRef.whereEqualTo("username", trimmedUsername).limit(1).get().await()
+            Text(
+                text = "Lưu tài khoản",
+                fontSize = 14.sp,
+                color = Color.Gray
+            )
 
-                        if (query.isEmpty) {
-                            Toast.makeText(context, "Username không tồn tại.", Toast.LENGTH_LONG).show()
-                            return@launch
-                        }
+            Spacer(modifier = Modifier.weight(1f))
 
-                        // 2. Lấy ra email đã lưu
-                        val userDoc = query.documents[0]
-                        val emailForAuth = userDoc.getString("emailForAuth")
-
-                        if (emailForAuth != null) {
-                            // 3. Dùng email đó và mật khẩu để đăng nhập
-                            auth.signInWithEmailAndPassword(emailForAuth, password.trim()).await()
-                            navigateToHome()
-                        } else {
-                            Toast.makeText(context, "Lỗi dữ liệu người dùng.", Toast.LENGTH_LONG).show()
-                        }
-                    } catch (e: Exception) {
-                        Log.e("LoginScreen", "Đăng nhập thất bại", e)
-                        if (e is FirebaseAuthInvalidCredentialsException) {
-                            Toast.makeText(context, "Sai mật khẩu. Vui lòng thử lại.", Toast.LENGTH_LONG).show()
-                        } else {
-                            Toast.makeText(context, "Đăng nhập thất bại: Lỗi hệ thống.", Toast.LENGTH_LONG).show()
-                        }
+            // Clear saved credentials button
+            if (sharedPrefs.getBoolean("remember_me", false)) {
+                TextButton(
+                    onClick = {
+                        sharedPrefs.edit().clear().apply()
+                        username = ""
+                        password = ""
+                        rememberMe = false
+                        Toast.makeText(context, "Đã xóa thông tin đã lưu", Toast.LENGTH_SHORT).show()
                     }
+                ) {
+                    Text(
+                        text = "Xóa đã lưu",
+                        fontSize = 12.sp,
+                        color = Color.Red
+                    )
                 }
-            },
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Login Button
+        Button(
+            onClick = { login() },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
             shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
+            enabled = !isLoading && !isGoogleLoading
         ) {
-            Text(text = "LOGIN", color = Color.White, fontSize = 16.sp)
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(text = "ĐĂNG NHẬP", color = Color.White, fontSize = 16.sp)
+            }
         }
+
         Spacer(modifier = Modifier.height(24.dp))
+
+        // Divider
+        Text(text = "hoặc", color = Color.Gray, fontSize = 14.sp)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Google Sign-In Button
+        SocialLoginButton(
+            text = "Tiếp tục với Google",
+            iconResId = R.drawable.logogoogle,
+            onClick = {
+                isGoogleLoading = true
+                googleSignInLauncher.launch(googleSignInClient.signInIntent)
+            },
+            isLoading = isGoogleLoading,
+            enabled = !isLoading && !isGoogleLoading
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Sign Up Text
         SignUpText(navController = navController)
     }
 }
 
 @Composable
-fun SocialLoginButton(text: String, iconResId: Int, onClick: () -> Unit) {
+fun SocialLoginButton(
+    text: String,
+    iconResId: Int,
+    onClick: () -> Unit,
+    isLoading: Boolean = false,
+    enabled: Boolean = true
+) {
     OutlinedButton(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .height(50.dp),
         shape = RoundedCornerShape(8.dp),
-        border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp)
+        border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
+        enabled = enabled
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Image(
-                painter = painterResource(id = iconResId),
-                contentDescription = "$text icon",
-                modifier = Modifier.size(24.dp),
-                contentScale = ContentScale.Fit
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(text = text, color = Color.Black, fontSize = 16.sp)
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = Color.Black
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = iconResId),
+                    contentDescription = "$text icon",
+                    modifier = Modifier.size(24.dp),
+                    contentScale = ContentScale.Fit
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Text(text = text, color = Color.Black, fontSize = 16.sp)
+            }
         }
     }
 }
@@ -223,14 +432,16 @@ fun SocialLoginButton(text: String, iconResId: Int, onClick: () -> Unit) {
 fun SignUpText(navController: NavController) {
     val annotatedText = buildAnnotatedString {
         withStyle(style = SpanStyle(color = Color.Gray, fontSize = 14.sp)) {
-            append("Don't have an account? ")
+            append("Chưa có tài khoản? ")
         }
+
         pushStringAnnotation(tag = "SignUp", annotation = "SignUp")
         withStyle(style = SpanStyle(color = Color(0xFF0052D4), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)) {
-            append("Sign up")
+            append("Đăng ký")
         }
         pop()
     }
+
     ClickableText(
         text = annotatedText,
         onClick = { offset ->

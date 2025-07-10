@@ -32,15 +32,51 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+
     NavHost(navController = navController, startDestination = "login") {
         composable("login") {
             LoginScreen(navController = navController)
         }
+
         composable("signup") {
             SignUpScreen(navController = navController)
         }
+
         composable("home") {
-            HomeScreen()
+            HomeScreen(navController = navController)
+        }
+
+        composable("compose_post") {
+            ComposePostScreen(navController = navController)
+        }
+
+        composable("search") {
+            SearchScreen(navController = navController)
+        }
+
+        composable("notifications") {
+            NotificationsScreen(navController = navController)
+        }
+
+        composable("profile") {
+            ProfileScreen(navController = navController)
+        }
+
+        composable("profile/{userId}") { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId")
+            ProfileScreen(navController = navController, userId = userId)
+        }
+
+        composable("edit_profile") {
+            EditProfileScreen(navController = navController)
+        }
+
+        composable("settings") {
+            SettingsScreen(navController = navController)
+        }
+
+        composable("favourites") {
+            FavouritesScreen(navController = navController)
         }
     }
 }

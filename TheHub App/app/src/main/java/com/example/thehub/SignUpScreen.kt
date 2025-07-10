@@ -1,12 +1,11 @@
 package com.example.thehub
 
-import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,169 +13,223 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignUpScreen(navController: NavController) {
     var username by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
 
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
-    val auth: FirebaseAuth = Firebase.auth
+    val coroutineScope = rememberCoroutineScope()
+    val auth = Firebase.auth
     val db = Firebase.firestore
+
+    fun signUp() {
+        if (username.isBlank()) {
+            Toast.makeText(context, "Vui lòng nhập username", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (email.isBlank() || password.isBlank()) {
+            Toast.makeText(context, "Vui lòng điền đầy đủ thông tin", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (password != confirmPassword) {
+            Toast.makeText(context, "Mật khẩu không khớp", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (password.length < 6) {
+            Toast.makeText(context, "Mật khẩu phải có ít nhất 6 ký tự", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        coroutineScope.launch {
+            isLoading = true
+            try {
+                // Kiểm tra username đã tồn tại chưa
+                val usernameQuery = db.collection("users")
+                    .whereEqualTo("username", username)
+                    .get()
+                    .await()
+
+                if (!usernameQuery.isEmpty) {
+                    Toast.makeText(context, "Username đã tồn tại", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                // Tạo tài khoản Firebase Auth
+                val result = auth.createUserWithEmailAndPassword(email, password).await()
+                val user = result.user
+
+                if (user != null) {
+                    // Lưu thông tin user vào Firestore
+                    val userData = hashMapOf(
+                        "uid" to user.uid,
+                        "username" to username,
+                        "email" to email,
+                        "displayName" to username,
+                        "avatarUrl" to "",
+                        "bio" to "",
+                        "followersCount" to 0,
+                        "followingCount" to 0,
+                        "postsCount" to 0,
+                        "createdAt" to System.currentTimeMillis()
+                    )
+
+                    db.collection("users").document(user.uid).set(userData).await()
+
+                    // Cập nhật displayName trong Firebase Auth
+                    val profileUpdates = com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                        .setDisplayName(username)
+                        .build()
+
+                    user.updateProfile(profileUpdates).await()
+
+                    Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
+                    navController.navigate("home") {
+                        popUpTo("signup") { inclusive = true }
+                    }
+                }
+
+            } catch (e: Exception) {
+                Toast.makeText(context, "Lỗi đăng ký: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isLoading = false
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .padding(horizontal = 32.dp),
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        // Logo
         Image(
             painter = painterResource(id = R.drawable.logothehub),
-            contentDescription = "App Logo",
-            modifier = Modifier.size(80.dp)
+            contentDescription = "Logo",
+            modifier = Modifier.size(120.dp)
         )
-        Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            text = "Sign up for TheHub",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black
-        )
-        Spacer(modifier = Modifier.height(40.dp))
 
-        OutlinedTextField(
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text(
+            text = "Tạo tài khoản",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Username field
+        TextField(
             value = username,
             onValueChange = { username = it },
             label = { Text("Username") },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(8.dp),
+            colors = TextFieldDefaults.colors(
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            )
         )
+
         Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(
+
+        // Email field
+        TextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            colors = TextFieldDefaults.colors(
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            )
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Password field
+        TextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Your password") },
+            label = { Text("Mật khẩu") },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(8.dp),
+            colors = TextFieldDefaults.colors(
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            )
         )
+
         Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(
+
+        // Confirm Password field
+        TextField(
             value = confirmPassword,
             onValueChange = { confirmPassword = it },
-            label = { Text("Confirm your new password") },
+            label = { Text("Xác nhận mật khẩu") },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(8.dp),
+            colors = TextFieldDefaults.colors(
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            )
         )
+
         Spacer(modifier = Modifier.height(32.dp))
 
+        // Sign Up Button
         Button(
-            onClick = {
-                if (username.isBlank() || password.isBlank()) {
-                    Toast.makeText(context, "Vui lòng nhập đầy đủ thông tin.", Toast.LENGTH_SHORT).show()
-                    return@Button
-                }
-                if (password != confirmPassword) {
-                    Toast.makeText(context, "Mật khẩu xác nhận không khớp.", Toast.LENGTH_SHORT).show()
-                    return@Button
-                }
-                coroutineScope.launch {
-                    try {
-                        val trimmedUsername = username.trim()
-
-                        //  Kiểm tra xem username đã tồn tại trong Firestore chưa
-                        val usersRef = db.collection("users")
-                        val usernameQuery = usersRef.whereEqualTo("username", trimmedUsername).limit(1).get().await()
-                        if (!usernameQuery.isEmpty) {
-                            Toast.makeText(context, "Username này đã tồn tại.", Toast.LENGTH_LONG).show()
-                            return@launch
-                        }
-
-                        // Xử lý thông minh: Nếu username là email, dùng nó. Nếu không, tạo email giả.
-                        val emailForAuth = if (android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedUsername).matches()) {
-                            trimmedUsername
-                        } else {
-                            "$trimmedUsername@example.com"
-                        }
-
-                        //  Tạo tài khoản trong Firebase Authentication
-                        val authResult = auth.createUserWithEmailAndPassword(emailForAuth, password.trim()).await()
-                        val firebaseUser = authResult.user
-
-                        //  Lưu thông tin người dùng vào Firestore
-                        if (firebaseUser != null) {
-                            val userMap = hashMapOf(
-                                "uid" to firebaseUser.uid,
-                                "username" to trimmedUsername,
-                                "emailForAuth" to emailForAuth // Lưu email đã dùng để xác thực
-                            )
-                            db.collection("users").document(firebaseUser.uid).set(userMap).await()
-                        }
-
-                        Toast.makeText(context, "Đăng ký thành công! Vui lòng đăng nhập.", Toast.LENGTH_LONG).show()
-                        navController.navigate("login") { popUpTo("login") { inclusive = true } }
-                    } catch (e: Exception) {
-                        Log.e("SignUp", "Đăng ký thất bại", e)
-                        if (e is FirebaseAuthUserCollisionException) {
-                            Toast.makeText(context, "Username hoặc email tương ứng đã được sử dụng.", Toast.LENGTH_LONG).show()
-                        } else {
-                            Toast.makeText(context, "Đăng ký thất bại: ${e.message}", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
-            },
+            onClick = { signUp() },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
-            shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+            enabled = !isLoading,
+            shape = RoundedCornerShape(8.dp)
         ) {
-            Text(text = "SIGN UP", color = Color.White, fontSize = 16.sp)
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = Color.White
+                )
+            } else {
+                Text("Đăng ký", fontSize = 16.sp)
+            }
         }
-        Spacer(modifier = Modifier.height(24.dp))
-        LoginText(navController)
-    }
-}
 
-@Composable
-fun LoginText(navController: NavController) {
-    val annotatedText = buildAnnotatedString {
-        withStyle(style = SpanStyle(color = Color.Gray, fontSize = 14.sp)) {
-            append("Already have an account? ")
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Login link
+        TextButton(
+            onClick = { navController.navigate("login") }
+        ) {
+            Text("Đã có tài khoản? Đăng nhập")
         }
-        pushStringAnnotation(tag = "Login", annotation = "Login")
-        withStyle(style = SpanStyle(color = Color(0xFF0052D4), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)) {
-            append("Login")
-        }
-        pop()
     }
-    ClickableText(
-        text = annotatedText,
-        onClick = { offset ->
-            annotatedText.getStringAnnotations(tag = "Login", start = offset, end = offset)
-                .firstOrNull()?.let {
-                    navController.navigate("login")
-                }
-        }
-    )
 }

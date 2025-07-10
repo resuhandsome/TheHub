@@ -1,15 +1,19 @@
 package com.example.thehub
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
@@ -18,228 +22,565 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
-// Lớp dữ liệu đại diện cho một bài đăng
 data class Post(
+    val id: String = "",
+    val authorId: String = "",
     val author: String,
     val authorAvatarUrl: String,
     val time: String,
     val content: String,
-    val imageUrl: String? = null
-)
-
-// bài đăng mẫu
-val samplePosts = listOf(
-    Post(
-        author = "deanobeidallah",
-        authorAvatarUrl = "https://i.pravatar.cc/150?u=deano",
-        time = "1 ngày",
-        content = "Trump started the fire with his erratic tariffs now he surrenders. Yet media claims Trump is a savior for making a trade deal with China. There is NO deal. Trump surrendered but not before he caused much pain to small and mid-sized businesses, dock workers, truckers and people with 401ks/stocks"
-    ),
-    Post(
-        author = "walsh_freedom",
-        authorAvatarUrl = "https://i.pravatar.cc/150?u=walsh",
-        time = "1 ngày",
-        content = "So economically, the next four years are gonna be just an endless cycle of 90 day “pauses” on all the bad shit Trump tries to do, huh?"
-    ),
-    Post(
-        author = "viktoraxelsen",
-        authorAvatarUrl = "https://i.pravatar.cc/150?u=viktor",
-        time = "7 giờ",
-        content = "A good day of filming for my fantastic partner HELM, together with The Company Film, Aarhus 😊🤝🎬",
-        imageUrl = "https://i.imgur.com/8a3n2fC.jpeg"
-    )
+    val imageUrls: List<String> = emptyList(),
+    val likes: Int = 0,
+    val likedBy: List<String> = emptyList(),
+    val comments: Int = 0,
+    val timestamp: Long = 0L
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
-    // Lấy thông tin người dùng hiện tại từ Firebase Auth
+fun HomeScreen(navController: NavController) {
     val currentUser = Firebase.auth.currentUser
-
-    // Xác định avatar để hiển thị
-    val avatarUrl = currentUser?.photoUrl
     val defaultAvatar = R.drawable.logomacdinh
+
+    var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var currentUserProfile by remember { mutableStateOf<UserProfile?>(null) }
+
+    val db = Firebase.firestore
+    val context = LocalContext.current
+
+    // Load user profile
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
+            currentUserProfile = UserRepository.getCurrentUserProfile()
+        }
+    }
+
+    // Load posts with user profiles
+    LaunchedEffect(Unit) {
+        try {
+            val postsSnapshot = db.collection("posts")
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .get()
+                .await()
+
+            val postsWithProfiles = mutableListOf<Post>()
+
+            for (doc in postsSnapshot.documents) {
+                val authorId = doc.getString("authorId") ?: ""
+                var authorName = doc.getString("authorName") ?: "Unknown User"
+                var authorAvatarUrl = doc.getString("authorAvatarUrl") ?: ""
+
+                // Load author profile from Firestore if authorName is Unknown User
+                if (authorName == "Unknown User" && authorId.isNotEmpty()) {
+                    try {
+                        val authorProfile = UserRepository.getUserProfile(authorId)
+                        if (authorProfile != null) {
+                            authorName = authorProfile.username
+                            authorAvatarUrl = authorProfile.avatarUrl
+                        }
+                    } catch (e: Exception) {
+                        // Keep default values if profile load fails
+                    }
+                }
+
+                val post = Post(
+                    id = doc.id,
+                    authorId = authorId,
+                    author = authorName,
+                    authorAvatarUrl = authorAvatarUrl,
+                    time = formatTime(doc.getLong("timestamp") ?: 0L),
+                    content = doc.getString("content") ?: "",
+                    imageUrls = doc.get("imageUrls") as? List<String> ?: emptyList(),
+                    likes = doc.getLong("likes")?.toInt() ?: 0,
+                    likedBy = doc.get("likedBy") as? List<String> ?: emptyList(),
+                    comments = doc.getLong("comments")?.toInt() ?: 0,
+                    timestamp = doc.getLong("timestamp") ?: 0L
+                )
+
+                postsWithProfiles.add(post)
+            }
+
+            posts = postsWithProfiles
+
+        } catch (e: Exception) {
+            Toast.makeText(context, "Lỗi khi tải bài viết: ${e.message}", Toast.LENGTH_SHORT).show()
+        } finally {
+            isLoading = false
+        }
+    }
 
     Scaffold(
         topBar = {
-            // Sử dụng Column để xếp chồng các thành phần theo chiều dọc
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF8F8F8))
-                    .padding(start = 16.dp, end = 16.dp, top = 30.dp, bottom = 8.dp)
+            // Top Bar được thiết kế lại đẹp mắt
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shadowElevation = 4.dp,
+                color = Color.White
             ) {
-                //Logo và Tên logo
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                        .statusBarsPadding()
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.logothehub),
-                        contentDescription = "App Logo",
-                        modifier = Modifier.height(60.dp)
-                    )
-                    Spacer(modifier = Modifier.width(15.dp))
-                    Text(
-                        text = "TheHub",
-                        fontSize = 25.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                //  Thanh tìm kiếm và Avatar
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    var searchText by remember { mutableStateOf("") }
-                    TextField(
-                        value = searchText,
-                        onValueChange = { searchText = it },
-                        placeholder = { Text("Search...", fontSize = 14.sp) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search Icon") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(40.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    // Avatar người dùng
-                    if (avatarUrl != null) {
-                        AsyncImage(
-                            model = avatarUrl,
-                            contentDescription = "User Avatar",
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
+                    // Logo và Tên logo - điều chỉnh vị trí
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Image(
-                            painter = painterResource(id = defaultAvatar),
-                            contentDescription = "Default Avatar",
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
+                            painter = painterResource(id = R.drawable.logothehub),
+                            contentDescription = "App Logo",
+                            modifier = Modifier.size(50.dp) // Giảm size logo một chút
                         )
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Chữ TheHub thấp xuống một chút
+                        Text(
+                            text = "TheHub",
+                            fontSize = 24.sp, // Giảm size chữ
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1A1A1A),
+                            modifier = Modifier.offset(y = 2.dp) // Thấp xuống 2dp
+                        )
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        // Avatar người dùng với border đẹp - THÊM NAVIGATION
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .shadow(2.dp, CircleShape)
+                                .clickable { navController.navigate("profile") } // THÊM DÒNG NÀY
+                        ) {
+                            AsyncImage(
+                                model = currentUserProfile?.avatarUrl?.takeIf { it.isNotEmpty() }
+                                    ?: currentUser?.photoUrl,
+                                contentDescription = "User Avatar",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                                    .background(Color.Gray.copy(alpha = 0.2f)),
+                                contentScale = ContentScale.Crop,
+                                placeholder = painterResource(id = defaultAvatar)
+                            )
+                        }
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Thanh tìm kiếm được thiết kế lại
+                    TextField(
+                        value = "",
+                        onValueChange = { },
+                        placeholder = {
+                            Text(
+                                "Tìm kiếm bài viết, người dùng...",
+                                fontSize = 14.sp,
+                                color = Color.Gray
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Search Icon",
+                                tint = Color.Gray,
+                                modifier = Modifier.clickable {
+                                    navController.navigate("search")
+                                }
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .clickable { navController.navigate("search") },
+                        shape = RoundedCornerShape(24.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color(0xFFF5F5F5),
+                            unfocusedContainerColor = Color(0xFFF5F5F5),
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledContainerColor = Color(0xFFF5F5F5),
+                            disabledIndicatorColor = Color.Transparent
+                        ),
+                        enabled = false
+                    )
                 }
             }
         },
         bottomBar = {
-            // Thanh điều hướng dưới cùng
-            BottomAppBar(
-                containerColor = Color.White,
-                contentPadding = PaddingValues(horizontal = 16.dp)
+            // Bottom Navigation được thiết kế lại đẹp mắt
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shadowElevation = 8.dp,
+                color = Color.White
             ) {
-                // thông báo
-                IconButton(onClick = { /*TODO*/ }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Notifications, contentDescription = "Notifications")
-                }
-                // thêm bài
-                IconButton(onClick = { /*TODO*/ }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Post")
-                }
-                // ngôi nhà
-                IconButton(onClick = { /*TODO*/ }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Home, contentDescription = "Home")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                        .navigationBarsPadding(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Notifications Button
+                    BottomNavItem(
+                        icon = Icons.Default.Notifications,
+                        label = "Thông báo",
+                        isSelected = false,
+                        onClick = { navController.navigate("notifications") }
+                    )
+
+                    // Add Post Button - Nút chính giữa đặc biệt
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .shadow(4.dp, CircleShape)
+                            .background(
+                                Color(0xFF007AFF),
+                                CircleShape
+                            )
+                            .clickable { navController.navigate("compose_post") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Add Post",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    // Home Button
+                    BottomNavItem(
+                        icon = Icons.Default.Home,
+                        label = "Trang chủ",
+                        isSelected = true,
+                        onClick = { }
+                    )
                 }
             }
         }
     ) { paddingValues ->
-        // Nội dung chính - Danh sách các bài đăng
-        LazyColumn(
+        // Content area với background gradient nhẹ
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color.White)
+                .background(Color(0xFFFAFAFA))
         ) {
-            items(samplePosts) { post ->
-                PostItem(post = post)
-                Divider(color = Color.LightGray, thickness = 0.5.dp)
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = Color(0xFF007AFF),
+                        strokeWidth = 3.dp
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    items(posts) { post ->
+                        PostItem(post = post, navController = navController) // THÊM navController
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun PostItem(post: Post) {
+fun BottomNavItem(
+    icon: ImageVector,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
     Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
+            .clickable { onClick() }
+            .padding(8.dp)
     ) {
-        // Phần đầu của bài đăng (avatar, tên tác giả, thời gian)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(
+                    if (isSelected) Color(0xFF007AFF).copy(alpha = 0.1f) else Color.Transparent,
+                    RoundedCornerShape(20.dp)
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            AsyncImage(
-                model = post.authorAvatarUrl,
-                contentDescription = "Author Avatar",
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (isSelected) Color(0xFF007AFF) else Color.Gray,
+                modifier = Modifier.size(24.dp)
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = post.author, fontWeight = FontWeight.Bold)
-                Text(text = post.time, fontSize = 12.sp, color = Color.Gray)
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            color = if (isSelected) Color(0xFF007AFF) else Color.Gray,
+            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
+        )
+    }
+}
+
+@Composable
+fun PostItem(post: Post, navController: NavController) { // THÊM navController parameter
+    var isLiked by remember { mutableStateOf(post.likedBy.contains(Firebase.auth.currentUser?.uid)) }
+    var likeCount by remember { mutableStateOf(post.likes) }
+    var showComments by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val currentUser = Firebase.auth.currentUser
+    val db = Firebase.firestore
+
+    fun toggleLike() {
+        if (currentUser == null) return
+
+        coroutineScope.launch {
+            try {
+                val postRef = db.collection("posts").document(post.id)
+                val newLikedBy = if (isLiked) {
+                    post.likedBy.filter { it != currentUser.uid }
+                } else {
+                    post.likedBy + currentUser.uid
+                }
+
+                postRef.update(
+                    mapOf(
+                        "likedBy" to newLikedBy,
+                        "likes" to newLikedBy.size
+                    )
+                ).await()
+
+                // Tạo notification nếu like (không phải unlike)
+                if (!isLiked && post.authorId != currentUser.uid) {
+                    val currentUserProfile = UserRepository.getCurrentUserProfile()
+                    if (currentUserProfile != null) {
+                        val notificationData = hashMapOf(
+                            "type" to "like",
+                            "fromUserId" to currentUser.uid,
+                            "fromUsername" to currentUserProfile.username,
+                            "fromUserAvatar" to currentUserProfile.avatarUrl,
+                            "toUserId" to post.authorId,
+                            "message" to "đã thích bài viết của bạn",
+                            "postId" to post.id,
+                            "timestamp" to System.currentTimeMillis(),
+                            "isRead" to false
+                        )
+
+                        db.collection("notifications").add(notificationData).await()
+                    }
+                }
+
+                isLiked = !isLiked
+                likeCount = newLikedBy.size
+
+            } catch (e: Exception) {
+                Toast.makeText(context, "Lỗi khi thích bài viết", Toast.LENGTH_SHORT).show()
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+    }
 
-        // Nội dung bài đăng
-        Text(text = post.content, fontSize = 14.sp)
-
-        // Hình ảnh của bài đăng (nếu có)
-        if (post.imageUrl != null) {
-            Spacer(modifier = Modifier.height(12.dp))
-            AsyncImage(
-                model = post.imageUrl,
-                contentDescription = "Post Image",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
+    fun sharePost() {
+        val shareIntent = android.content.Intent().apply {
+            action = android.content.Intent.ACTION_SEND
+            putExtra(android.content.Intent.EXTRA_TEXT, "${post.author}: ${post.content}")
+            type = "text/plain"
         }
-        Spacer(modifier = Modifier.height(16.dp))
+        context.startActivity(android.content.Intent.createChooser(shareIntent, "Chia sẻ bài viết"))
+    }
 
-        // Các nút hành động (Thích, Bình luận, Chia sẻ)
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            Icon(
-                painter = painterResource(id = R.drawable.icontim),
-                contentDescription = "Like",
-                modifier = Modifier.size(24.dp) // Chỉnh kích thước icon
+    // Post Card với shadow và border radius đẹp
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Author info - THÊM NAVIGATION KHI CLICK AVATAR
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .shadow(1.dp, CircleShape)
+                        .clickable {
+                            navController.navigate("profile/${post.authorId}") // THÊM NAVIGATION
+                        }
+                ) {
+                    AsyncImage(
+                        model = post.authorAvatarUrl,
+                        contentDescription = "Author Avatar",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(Color.Gray.copy(alpha = 0.2f)),
+                        placeholder = painterResource(id = R.drawable.logomacdinh)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = post.author,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = Color(0xFF1A1A1A),
+                        modifier = Modifier.clickable {
+                            navController.navigate("profile/${post.authorId}") // THÊM NAVIGATION
+                        }
+                    )
+                    Text(
+                        text = post.time,
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Content
+            Text(
+                text = post.content,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                color = Color(0xFF333333)
             )
-            Icon(
-                painter = painterResource(id = R.drawable.iconbinhluan),
-                contentDescription = "Comment",
-                modifier = Modifier.size(24.dp) // Chỉnh kích thước icon
-            )
-            Icon(
-                painter = painterResource(id = R.drawable.iconchiase),
-                contentDescription = "Share",
-                modifier = Modifier.size(24.dp) // Chỉnh kích thước icon
-            )
+
+            // Images
+            if (post.imageUrls.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(post.imageUrls) { imageUrl ->
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = "Post Image",
+                            modifier = Modifier
+                                .size(200.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Action buttons với design đẹp hơn
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(32.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Like button
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { toggleLike() }
+                ) {
+                    Icon(
+                        imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = "Like",
+                        tint = if (isLiked) Color.Red else Color.Gray,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    if (likeCount > 0) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = likeCount.toString(),
+                            fontSize = 13.sp,
+                            color = Color.Gray,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                // Comment button
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { showComments = !showComments }
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.iconbinhluan),
+                        contentDescription = "Comment",
+                        modifier = Modifier.size(22.dp),
+                        tint = Color.Gray
+                    )
+                    if (post.comments > 0) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = post.comments.toString(),
+                            fontSize = 13.sp,
+                            color = Color.Gray,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                // Share button
+                Icon(
+                    painter = painterResource(id = R.drawable.iconchiase),
+                    contentDescription = "Share",
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clickable { sharePost() },
+                    tint = Color.Gray
+                )
+            }
+
+            // Comments section
+            if (showComments) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Divider(color = Color.Gray.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(8.dp))
+                CommentSection(postId = post.id)
+            }
         }
     }
 }
+
