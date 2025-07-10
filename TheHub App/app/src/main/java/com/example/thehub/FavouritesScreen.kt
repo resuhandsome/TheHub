@@ -1,15 +1,19 @@
 package com.example.thehub
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -34,66 +38,99 @@ fun FavouritesScreen(navController: NavController) {
     val currentUser = Firebase.auth.currentUser
     val db = Firebase.firestore
 
+    // Load liked posts
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             try {
-                val likedPostsSnapshot = db.collection("posts")
+                isLoading = true
+                errorMessage = ""
+
+                println("DEBUG: Loading liked posts for user: ${currentUser.uid}")
+
+                // Lấy tất cả posts mà user đã like
+                val postsSnapshot = db.collection("posts")
                     .whereArrayContains("likedBy", currentUser.uid)
-                    .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
                     .get()
                     .await()
 
-                val likedPostsList = mutableListOf<Post>()
+                println("DEBUG: Found ${postsSnapshot.size()} liked posts")
 
-                for (doc in likedPostsSnapshot.documents) {
-                    val authorId = doc.getString("authorId") ?: ""
-                    var authorName = doc.getString("authorName") ?: "Unknown User"
-                    var authorAvatarUrl = doc.getString("authorAvatarUrl") ?: ""
-
-                    if (authorName == "Unknown User" && authorId.isNotEmpty()) {
-                        try {
-                            val authorProfile = UserRepository.getUserProfile(authorId)
-                            if (authorProfile != null) {
-                                authorName = authorProfile.username
-                                authorAvatarUrl = authorProfile.avatarUrl
-                            }
-                        } catch (e: Exception) {
-                            // Keep default values
-                        }
+                likedPosts = postsSnapshot.documents.mapNotNull { doc ->
+                    try {
+                        Post(
+                            id = doc.id,
+                            authorId = doc.getString("authorId") ?: "",
+                            author = doc.getString("authorName") ?: "",
+                            authorAvatarUrl = doc.getString("authorAvatarUrl") ?: "",
+                            time = formatTime(doc.getLong("timestamp") ?: 0L),
+                            content = doc.getString("content") ?: "",
+                            imageUrls = doc.get("imageUrls") as? List<String> ?: emptyList(),
+                            likes = doc.getLong("likes")?.toInt() ?: 0,
+                            likedBy = doc.get("likedBy") as? List<String> ?: emptyList(),
+                            comments = doc.getLong("comments")?.toInt() ?: 0,
+                            timestamp = doc.getLong("timestamp") ?: 0L
+                        )
+                    } catch (e: Exception) {
+                        println("DEBUG: Error parsing liked post - ${e.message}")
+                        null
                     }
+                }.sortedByDescending { it.timestamp }
 
-                    val post = Post(
-                        id = doc.id,
-                        authorId = authorId,
-                        author = authorName,
-                        authorAvatarUrl = authorAvatarUrl,
-                        time = formatTime(doc.getLong("timestamp") ?: 0L),
-                        content = doc.getString("content") ?: "",
-                        imageUrls = doc.get("imageUrls") as? List<String> ?: emptyList(),
-                        likes = doc.getLong("likes")?.toInt() ?: 0,
-                        likedBy = doc.get("likedBy") as? List<String> ?: emptyList(),
-                        comments = doc.getLong("comments")?.toInt() ?: 0,
-                        timestamp = doc.getLong("timestamp") ?: 0L
-                    )
-
-                    likedPostsList.add(post)
-                }
-
-                likedPosts = likedPostsList
+                println("DEBUG: Successfully loaded ${likedPosts.size} liked posts")
 
             } catch (e: Exception) {
-                errorMessage = e.message ?: "Lỗi không xác định"
+                errorMessage = "Lỗi khi tải bài viết đã thích: ${e.message}"
+                println("DEBUG: Error loading liked posts - ${e.message}")
+                Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
             } finally {
                 isLoading = false
             }
+        } else {
+            errorMessage = "Chưa đăng nhập"
+            isLoading = false
+            println("DEBUG: User not logged in")
         }
     }
 
     fun retryLoadLikedPosts() {
-        isLoading = true
-        errorMessage = ""
         coroutineScope.launch {
-            // Retry logic
+            if (currentUser != null) {
+                try {
+                    isLoading = true
+                    errorMessage = ""
+
+                    val postsSnapshot = db.collection("posts")
+                        .whereArrayContains("likedBy", currentUser.uid)
+                        .get()
+                        .await()
+
+                    likedPosts = postsSnapshot.documents.mapNotNull { doc ->
+                        try {
+                            Post(
+                                id = doc.id,
+                                authorId = doc.getString("authorId") ?: "",
+                                author = doc.getString("authorName") ?: "",
+                                authorAvatarUrl = doc.getString("authorAvatarUrl") ?: "",
+                                time = formatTime(doc.getLong("timestamp") ?: 0L),
+                                content = doc.getString("content") ?: "",
+                                imageUrls = doc.get("imageUrls") as? List<String> ?: emptyList(),
+                                likes = doc.getLong("likes")?.toInt() ?: 0,
+                                likedBy = doc.get("likedBy") as? List<String> ?: emptyList(),
+                                comments = doc.getLong("comments")?.toInt() ?: 0,
+                                timestamp = doc.getLong("timestamp") ?: 0L
+                            )
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }.sortedByDescending { it.timestamp }
+
+                } catch (e: Exception) {
+                    errorMessage = "Lỗi khi tải bài viết đã thích: ${e.message}"
+                    Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                } finally {
+                    isLoading = false
+                }
+            }
         }
     }
 
@@ -104,12 +141,16 @@ fun FavouritesScreen(navController: NavController) {
                     Text(
                         "Bài viết đã thích",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        fontSize = 20.sp
                     )
                 },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = Color.White
                 )
             )
         }
@@ -118,7 +159,7 @@ fun FavouritesScreen(navController: NavController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
+                .background(Color(0xFFFAFAFA))
         ) {
             when {
                 isLoading -> {
@@ -126,9 +167,7 @@ fun FavouritesScreen(navController: NavController) {
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        CircularProgressIndicator(color = Color(0xFF007AFF))
                     }
                 }
 
@@ -146,12 +185,12 @@ fun FavouritesScreen(navController: NavController) {
                             text = "Không thể tải bài viết",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
+                            color = Color(0xFF1A1A1A)
                         )
                         Text(
                             text = errorMessage,
                             fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = Color(0xFF666666),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 8.dp)
                         )
@@ -159,7 +198,7 @@ fun FavouritesScreen(navController: NavController) {
                         Button(
                             onClick = { retryLoadLikedPosts() },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
+                                containerColor = Color(0xFF007AFF)
                             )
                         ) {
                             Text("Thử lại")
@@ -179,7 +218,7 @@ fun FavouritesScreen(navController: NavController) {
                             Icons.Default.Favorite,
                             contentDescription = "No Likes",
                             modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.outline
+                            tint = Color(0xFFE0E0E0)
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -188,14 +227,14 @@ fun FavouritesScreen(navController: NavController) {
                             text = "Chưa có bài viết nào được thích",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onBackground,
+                            color = Color(0xFF1A1A1A),
                             textAlign = TextAlign.Center
                         )
 
                         Text(
                             text = "Hãy thích những bài viết yêu thích để xem lại sau",
                             fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = Color(0xFF666666),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 8.dp)
                         )

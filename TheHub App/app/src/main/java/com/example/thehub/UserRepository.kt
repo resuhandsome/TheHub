@@ -5,69 +5,119 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
 
+data class UserProfile(
+    val uid: String = "",
+    val username: String = "",
+    val email: String = "",
+    val displayName: String = "",
+    val avatarUrl: String = "",
+    val bio: String = "",
+    val followersCount: Int = 0,
+    val followingCount: Int = 0,
+    val postsCount: Int = 0,
+    val createdAt: Long = 0L
+)
+
 object UserRepository {
+    private val db = Firebase.firestore
     private val auth = Firebase.auth
-    private val firestore = Firebase.firestore
+
+    suspend fun getUserProfile(uid: String): UserProfile? {
+        return try {
+            val doc = db.collection("users").document(uid).get().await()
+            if (doc.exists()) {
+                UserProfile(
+                    uid = doc.getString("uid") ?: "",
+                    username = doc.getString("username") ?: "",
+                    email = doc.getString("email") ?: "",
+                    displayName = doc.getString("displayName") ?: "",
+                    avatarUrl = doc.getString("avatarUrl") ?: "",
+                    bio = doc.getString("bio") ?: "",
+                    followersCount = doc.getLong("followersCount")?.toInt() ?: 0,
+                    followingCount = doc.getLong("followingCount")?.toInt() ?: 0,
+                    postsCount = doc.getLong("postsCount")?.toInt() ?: 0,
+                    createdAt = doc.getLong("createdAt") ?: 0L
+                )
+            } else null
+        } catch (e: Exception) {
+            println("DEBUG: Error loading user profile - ${e.message}")
+            null
+        }
+    }
 
     suspend fun getCurrentUserProfile(): UserProfile? {
-        return try {
-            val currentUser = auth.currentUser ?: return null
-            val document = firestore.collection("users")
-                .document(currentUser.uid)
+        val currentUser = auth.currentUser
+        return if (currentUser != null) {
+            // Retry mechanism
+            var profile: UserProfile? = null
+            var attempts = 0
+
+            while (profile == null && attempts < 3) {
+                try {
+                    profile = getUserProfile(currentUser.uid)
+                    if (profile != null) break
+                } catch (e: Exception) {
+                    attempts++
+                    if (attempts < 3) {
+                        kotlinx.coroutines.delay(1000)
+                    }
+                }
+            }
+
+            profile
+        } else null
+    }
+
+    suspend fun updateUserProfile(userProfile: UserProfile) {
+        try {
+            db.collection("users").document(userProfile.uid).set(userProfile).await()
+        } catch (e: Exception) {
+            println("DEBUG: Error updating user profile - ${e.message}")
+            throw e
+        }
+    }
+
+    suspend fun recalculateFollowerCounts(userId: String) {
+        try {
+            val followersSnapshot = db.collection("follows")
+                .whereEqualTo("followingId", userId)
                 .get()
                 .await()
 
-            if (document.exists()) {
-                document.toObject(UserProfile::class.java)?.copy(id = currentUser.uid)
-            } else {
-                // Create default profile
-                val defaultProfile = UserProfile(
-                    id = currentUser.uid,
-                    username = currentUser.displayName ?: "user_${currentUser.uid.take(8)}",
-                    displayName = currentUser.displayName ?: "",
-                    email = currentUser.email ?: "",
-                    avatarUrl = currentUser.photoUrl?.toString() ?: ""
+            val actualFollowersCount = followersSnapshot.size()
+
+            val followingSnapshot = db.collection("follows")
+                .whereEqualTo("followerId", userId)
+                .get()
+                .await()
+
+            val actualFollowingCount = followingSnapshot.size()
+
+            val userRef = db.collection("users").document(userId)
+            userRef.update(
+                mapOf(
+                    "followersCount" to actualFollowersCount,
+                    "followingCount" to actualFollowingCount
                 )
+            ).await()
 
-                firestore.collection("users")
-                    .document(currentUser.uid)
-                    .set(defaultProfile)
-                    .await()
-
-                defaultProfile
-            }
         } catch (e: Exception) {
-            null
+            println("DEBUG: Error recalculating follower counts - ${e.message}")
         }
     }
+    suspend fun syncAllUserCounts() {
+        try {
+            val usersSnapshot = db.collection("users").get().await()
 
-    suspend fun getUserProfile(userId: String): UserProfile? {
-        return try {
-            val document = firestore.collection("users")
-                .document(userId)
-                .get()
-                .await()
-
-            if (document.exists()) {
-                document.toObject(UserProfile::class.java)?.copy(id = userId)
-            } else {
-                null
+            for (userDoc in usersSnapshot.documents) {
+                val userId = userDoc.id
+                recalculateFollowerCounts(userId)
             }
-        } catch (e: Exception) {
-            null
-        }
-    }
 
-    suspend fun updateUserProfile(userProfile: UserProfile): Boolean {
-        return try {
-            val currentUser = auth.currentUser ?: return false
-            firestore.collection("users")
-                .document(currentUser.uid)
-                .set(userProfile)
-                .await()
-            true
         } catch (e: Exception) {
-            false
+            println("DEBUG: Error syncing all user counts - ${e.message}")
         }
     }
 }
+
+

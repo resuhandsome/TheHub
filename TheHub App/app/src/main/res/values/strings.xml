@@ -1,8 +1,9 @@
 <resources>
-<string name="app_name">TheHub</string>
-<string name="facebook_application_id">741284924946947</string>
-<string name="facebook_client_token">4d0bad6a2c8761bd8d0186a62fab15ca</string>
-<string name="facebook_app_id">fb741284924946947</string>
 
-<string name="default_web_client_id">YOUR_GOOGLE_WEB_CLIENT_ID_HERE</string>
+    <string name="app_name">TheHub</string>
+
+    <string name="facebook_app_id">741284924946947</string>
+    <string name="facebook_client_token">4d0bad6a2c8761bd8d0186a62fab15ca</string>
+    <string name="fb_login_protocol_scheme">fb741284924946947</string>
 </resources>
+

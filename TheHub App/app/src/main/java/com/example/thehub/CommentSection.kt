@@ -1,6 +1,5 @@
 package com.example.thehub
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -29,7 +29,6 @@ import kotlinx.coroutines.tasks.await
 
 data class Comment(
     val id: String = "",
-    val postId: String = "",
     val authorId: String = "",
     val authorName: String = "",
     val authorAvatarUrl: String = "",
@@ -41,38 +40,42 @@ data class Comment(
 @Composable
 fun CommentSection(postId: String) {
     var comments by remember { mutableStateOf<List<Comment>>(emptyList()) }
-    var newComment by remember { mutableStateOf("") }
+    var commentText by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(true) }
-    var isSubmitting by remember { mutableStateOf(false) }
+    var currentUserProfile by remember { mutableStateOf<UserProfile?>(null) }
 
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val currentUser = Firebase.auth.currentUser
     val db = Firebase.firestore
-    val coroutineScope = rememberCoroutineScope()
+
+    // Load user profile
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
+            currentUserProfile = UserRepository.getCurrentUserProfile()
+        }
+    }
 
     // Load comments
     LaunchedEffect(postId) {
         try {
-            val commentsSnapshot = db.collection("comments")
-                .whereEqualTo("postId", postId)
-                .orderBy("timestamp", Query.Direction.DESCENDING)
+            val commentsSnapshot = db.collection("posts")
+                .document(postId)
+                .collection("comments")
+                .orderBy("timestamp", Query.Direction.ASCENDING)
                 .get()
                 .await()
 
-            val commentsList = commentsSnapshot.documents.map { doc ->
+            comments = commentsSnapshot.documents.map { doc ->
                 Comment(
                     id = doc.id,
-                    postId = doc.getString("postId") ?: "",
                     authorId = doc.getString("authorId") ?: "",
-                    authorName = doc.getString("authorName") ?: "Unknown User",
+                    authorName = doc.getString("authorName") ?: "",
                     authorAvatarUrl = doc.getString("authorAvatarUrl") ?: "",
                     content = doc.getString("content") ?: "",
                     timestamp = doc.getLong("timestamp") ?: 0L
                 )
             }
-
-            comments = commentsList
-
         } catch (e: Exception) {
             // Handle error
         } finally {
@@ -81,51 +84,76 @@ fun CommentSection(postId: String) {
     }
 
     fun addComment() {
-        if (newComment.isBlank() || currentUser == null || isSubmitting) return
+        if (commentText.isBlank() || currentUser == null || currentUserProfile == null) return
 
-        isSubmitting = true
         coroutineScope.launch {
             try {
-                val userProfile = UserRepository.getCurrentUserProfile()
-
                 val commentData = hashMapOf(
-                    "postId" to postId,
                     "authorId" to currentUser.uid,
-                    "authorName" to (userProfile?.username ?: currentUser.displayName ?: "Unknown User"),
-                    "authorAvatarUrl" to (userProfile?.avatarUrl ?: currentUser.photoUrl?.toString() ?: ""),
-                    "content" to newComment.trim(),
+                    "authorName" to currentUserProfile!!.username,
+                    "authorAvatarUrl" to currentUserProfile!!.avatarUrl,
+                    "content" to commentText,
                     "timestamp" to System.currentTimeMillis()
                 )
 
-                // Add comment
-                val commentRef = db.collection("comments").add(commentData).await()
+                db.collection("posts")
+                    .document(postId)
+                    .collection("comments")
+                    .add(commentData)
+                    .await()
 
-                // Update post comment count
-                val postRef = db.collection("posts").document(postId)
-                db.runTransaction { transaction ->
-                    val post = transaction.get(postRef)
-                    val currentComments = post.getLong("comments") ?: 0
-                    transaction.update(postRef, "comments", currentComments + 1)
-                }.await()
+                // Update comment count
+                db.collection("posts")
+                    .document(postId)
+                    .update("comments", comments.size + 1)
+                    .await()
 
-                // Add new comment to local list
-                val newCommentObj = Comment(
-                    id = commentRef.id,
-                    postId = postId,
-                    authorId = currentUser.uid,
-                    authorName = userProfile?.username ?: currentUser.displayName ?: "Unknown User",
-                    authorAvatarUrl = userProfile?.avatarUrl ?: currentUser.photoUrl?.toString() ?: "",
-                    content = newComment.trim(),
-                    timestamp = System.currentTimeMillis()
-                )
+                // TẠO NOTIFICATION CHO TÁC GIẢ BÀI VIẾT
+                val postDoc = db.collection("posts").document(postId).get().await()
+                val postAuthorId = postDoc.getString("authorId")
 
-                comments = listOf(newCommentObj) + comments
-                newComment = ""
+
+                if (postAuthorId != null && postAuthorId != currentUser.uid) {
+                    val notificationData = hashMapOf(
+                        "type" to "comment",
+                        "fromUserId" to currentUser.uid,
+                        "fromUsername" to currentUserProfile!!.username,
+                        "fromUserAvatar" to currentUserProfile!!.avatarUrl,
+                        "toUserId" to postAuthorId,
+                        "message" to "đã bình luận bài viết của bạn",
+                        "postId" to postId,
+                        "timestamp" to System.currentTimeMillis(),
+                        "isRead" to false
+                    )
+
+                    db.collection("notifications").add(notificationData).await()
+                    println("DEBUG: Created comment notification for $postAuthorId")
+                }
+
+                commentText = ""
+
+                // Reload comments
+                val updatedSnapshot = db.collection("posts")
+                    .document(postId)
+                    .collection("comments")
+                    .orderBy("timestamp", Query.Direction.ASCENDING)
+                    .get()
+                    .await()
+
+                comments = updatedSnapshot.documents.map { doc ->
+                    Comment(
+                        id = doc.id,
+                        authorId = doc.getString("authorId") ?: "",
+                        authorName = doc.getString("authorName") ?: "",
+                        authorAvatarUrl = doc.getString("authorAvatarUrl") ?: "",
+                        content = doc.getString("content") ?: "",
+                        timestamp = doc.getLong("timestamp") ?: 0L
+                    )
+                }
 
             } catch (e: Exception) {
-                // Handle error
-            } finally {
-                isSubmitting = false
+                android.widget.Toast.makeText(context, "Lỗi khi thêm bình luận", android.widget.Toast.LENGTH_SHORT).show()
+                println("DEBUG: Error adding comment - ${e.message}")
             }
         }
     }
@@ -133,95 +161,43 @@ fun CommentSection(postId: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(8.dp)
     ) {
         if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        } else if (comments.isEmpty()) {
-            Text(
-                text = "Chưa có bình luận nào",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(vertical = 16.dp)
-            )
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
         } else {
+            // Comments list
             LazyColumn(
-                modifier = Modifier.heightIn(max = 300.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.heightIn(max = 200.dp)
             ) {
                 items(comments) { comment ->
                     CommentItem(comment = comment)
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-        // Add comment input
-        if (currentUser != null) {
+            // Add comment input
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 TextField(
-                    value = newComment,
-                    onValueChange = { newComment = it },
-                    placeholder = {
-                        Text(
-                            "Viết bình luận...",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
+                    value = commentText,
+                    onValueChange = { commentText = it },
+                    placeholder = { Text("Viết bình luận...") },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(20.dp),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
-                    ),
-                    maxLines = 3
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    )
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                IconButton(
-                    onClick = { addComment() },
-                    enabled = newComment.isNotBlank() && !isSubmitting,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(
-                            if (newComment.isNotBlank() && !isSubmitting) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant,
-                            CircleShape
-                        )
-                ) {
-                    if (isSubmitting) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Send,
-                            contentDescription = "Send",
-                            tint = if (newComment.isNotBlank()) MaterialTheme.colorScheme.onPrimary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                IconButton(onClick = { addComment() }) {
+                    Icon(Icons.Default.Send, contentDescription = "Send")
                 }
             }
         }
@@ -231,49 +207,31 @@ fun CommentSection(postId: String) {
 @Composable
 fun CommentItem(comment: Comment) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
     ) {
         AsyncImage(
             model = comment.authorAvatarUrl,
-            contentDescription = "Author Avatar",
+            contentDescription = "Comment Author Avatar",
             modifier = Modifier
                 .size(32.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .clip(CircleShape),
             contentScale = ContentScale.Crop,
             placeholder = painterResource(id = R.drawable.logomacdinh)
         )
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(8.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = comment.authorName,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Text(
-                    text = formatTime(comment.timestamp),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
+            Text(
+                text = comment.authorName,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
             Text(
                 text = comment.content,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface,
-                lineHeight = 18.sp
+                fontSize = 14.sp
             )
         }
     }
