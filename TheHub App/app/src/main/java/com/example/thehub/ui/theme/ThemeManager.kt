@@ -1,48 +1,34 @@
 package com.example.thehub
 
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.Color
+import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 object ThemeManager {
+    private const val PREF_NAME = "theme_prefs"
+    private const val KEY_DARK_MODE = "dark_mode"
+
     var isDarkMode by mutableStateOf(false)
         private set
 
-    fun toggleDarkMode() {
+    fun initialize(context: Context) {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        isDarkMode = prefs.getBoolean(KEY_DARK_MODE, false)
+    }
+
+    fun toggleDarkMode(context: Context) {
         isDarkMode = !isDarkMode
+        saveDarkModePreference(context)
     }
 
-    fun setThemeMode(enabled: Boolean) {
+    fun setDarkMode(context: Context, enabled: Boolean) {
         isDarkMode = enabled
+        saveDarkModePreference(context)
     }
 
-    @Composable
-    fun initializeWithSystem() {
-        val systemDarkMode = isSystemInDarkTheme()
-        LaunchedEffect(systemDarkMode) {
-            if (!isDarkMode) {  // Chỉ set nếu chưa được user thay đổi
-                isDarkMode = systemDarkMode
-            }
-        }
-    }
-
-    @Composable
-    fun getColorScheme(): ColorScheme {
-        return if (isDarkMode) {
-            darkColorScheme(
-                primary = Color(0xFF007AFF),
-                background = Color(0xFF121212),
-                surface = Color(0xFF1E1E1E)
-            )
-        } else {
-            lightColorScheme(
-                primary = Color(0xFF007AFF),
-                background = Color.White,
-                surface = Color.White
-            )
-        }
+    private fun saveDarkModePreference(context: Context) {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_DARK_MODE, isDarkMode).apply()
     }
 }
