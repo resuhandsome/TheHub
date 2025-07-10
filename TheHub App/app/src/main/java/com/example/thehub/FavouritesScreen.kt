@@ -53,15 +53,11 @@ fun FavouritesScreen(navController: NavController) {
                 isLoading = true
                 errorMessage = ""
 
-                println("DEBUG: Loading liked posts for user: ${currentUser.uid}")
-
                 // Lấy tất cả posts mà user đã like
                 val postsSnapshot = db.collection("posts")
                     .whereArrayContains("likedBy", currentUser.uid)
                     .get()
                     .await()
-
-                println("DEBUG: Found ${postsSnapshot.size()} liked posts")
 
                 likedPosts = postsSnapshot.documents.mapNotNull { doc ->
                     try {
@@ -79,16 +75,12 @@ fun FavouritesScreen(navController: NavController) {
                             timestamp = doc.getLong("timestamp") ?: 0L
                         )
                     } catch (e: Exception) {
-                        println("DEBUG: Error parsing liked post - ${e.message}")
                         null
                     }
                 }.sortedByDescending { it.timestamp }
 
-                println("DEBUG: Successfully loaded ${likedPosts.size} liked posts")
-
             } catch (e: Exception) {
                 errorMessage = "Lỗi khi tải bài viết đã thích: ${e.message}"
-                println("DEBUG: Error loading liked posts - ${e.message}")
                 Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
             } finally {
                 isLoading = false
@@ -96,7 +88,6 @@ fun FavouritesScreen(navController: NavController) {
         } else {
             errorMessage = "Chưa đăng nhập"
             isLoading = false
-            println("DEBUG: User not logged in")
         }
     }
 

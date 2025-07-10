@@ -1,4 +1,4 @@
-package com.example.thehub.search
+package com.example.thehub
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,9 +15,16 @@ class SearchViewModel : ViewModel() {
     private val _results = MutableStateFlow<List<SearchItem>>(emptyList())
     val results: StateFlow<List<SearchItem>> = _results
 
-    fun updateQuery(q: String) { _query.value = q }
+    fun updateQuery(q: String) {
+        _query.value = q
+        if (q.isNotBlank()) {
+            search(q)
+        } else {
+            _results.value = emptyList()
+        }
+    }
 
-    fun search(q: String) = viewModelScope.launch {
+    private fun search(q: String) = viewModelScope.launch {
         _results.value = repo.search(q)
     }
 }

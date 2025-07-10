@@ -1,4 +1,4 @@
-package com.example.thehub.search
+package com.example.thehub
 
 import com.google.firebase.firestore.Query
 import com.google.firebase.ktx.Firebase
@@ -28,7 +28,9 @@ class SearchRepository {
         }
         val posts = async {
             db.collection("posts")
-                .whereArrayContains("keywords", q.lowercase())
+                .whereGreaterThanOrEqualTo("content", q)
+                .whereLessThanOrEqualTo("content", q + '\uf8ff')
+                .orderBy("content")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .limit(20)
                 .get().await()
