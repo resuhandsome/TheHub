@@ -1,8 +1,6 @@
 package com.example.thehub
 
 import android.app.Activity
-import android.content.Context
-import android.content.SharedPreferences
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -31,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
@@ -42,6 +39,7 @@ import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,19 +55,11 @@ fun LoginScreen(navController: NavController) {
     val auth = Firebase.auth
     val db = Firebase.firestore
 
-    // SharedPreferences để lưu tài khoản
-    val sharedPrefs = context.getSharedPreferences("login_prefs", Context.MODE_PRIVATE)
-
-    // Load saved credentials khi khởi tạo
-    LaunchedEffect(Unit) {
-        val savedUsername = sharedPrefs.getString("saved_username", "")
-        val savedPassword = sharedPrefs.getString("saved_password", "")
-        val wasRemembered = sharedPrefs.getBoolean("remember_me", false)
-
-        if (wasRemembered && !savedUsername.isNullOrEmpty()) {
-            username = savedUsername
-            password = savedPassword ?: ""
-            rememberMe = true
+    // Navigation function
+    val navigateToHome = {
+        Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
+        navController.navigate("home") {
+            popUpTo("login") { inclusive = true }
         }
     }
 
@@ -80,14 +70,6 @@ fun LoginScreen(navController: NavController) {
             .requestEmail()
             .build()
         GoogleSignIn.getClient(context, gso)
-    }
-
-    // Navigation function
-    val navigateToHome = {
-        Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
-        navController.navigate("home") {
-            popUpTo("login") { inclusive = true }
-        }
     }
 
     // Google Sign-In Launcher
@@ -141,20 +123,6 @@ fun LoginScreen(navController: NavController) {
         }
     }
 
-    fun saveCredentials() {
-        val editor = sharedPrefs.edit()
-        if (rememberMe) {
-            editor.putString("saved_username", username)
-            editor.putString("saved_password", password)
-            editor.putBoolean("remember_me", true)
-        } else {
-            editor.remove("saved_username")
-            editor.remove("saved_password")
-            editor.putBoolean("remember_me", false)
-        }
-        editor.apply()
-    }
-
     fun login() {
         if (username.isBlank() || password.isBlank()) {
             Toast.makeText(context, "Vui lòng nhập username và mật khẩu.", Toast.LENGTH_SHORT).show()
@@ -166,13 +134,17 @@ fun LoginScreen(navController: NavController) {
             try {
                 val trimmedUsername = username.trim()
 
+                // Kiểm tra kết nối Firebase với timeout
                 if (Firebase.auth.app == null) {
                     Toast.makeText(context, "Lỗi kết nối Firebase", Toast.LENGTH_SHORT).show()
                     return@launch
                 }
 
+                // Thêm timeout cho Firestore query
                 val usersRef = db.collection("users")
-                val query = usersRef.whereEqualTo("username", trimmedUsername).limit(1).get().await()
+                val query = withTimeout(15000) { // 15 seconds timeout
+                    usersRef.whereEqualTo("username", trimmedUsername).limit(1).get().await()
+                }
 
                 if (query.isEmpty) {
                     Toast.makeText(context, "Username không tồn tại.", Toast.LENGTH_LONG).show()
@@ -183,19 +155,24 @@ fun LoginScreen(navController: NavController) {
                 val emailForAuth = userDoc.getString("email")
 
                 if (emailForAuth != null) {
-                    auth.signInWithEmailAndPassword(emailForAuth, password.trim()).await()
+                    // Thêm timeout cho authentication
+                    withTimeout(15000) {
+                        auth.signInWithEmailAndPassword(emailForAuth, password.trim()).await()
+                    }
 
                     var userProfile: UserProfile? = null
                     var retryCount = 0
 
                     while (userProfile == null && retryCount < 3) {
                         try {
-                            userProfile = UserRepository.getCurrentUserProfile()
+                            userProfile = withTimeout(10000) {
+                                UserRepository.getCurrentUserProfile()
+                            }
                             break
                         } catch (e: Exception) {
                             retryCount++
                             if (retryCount < 3) {
-                                delay(1000)
+                                delay(2000) // Tăng delay time
                             }
                         }
                     }
@@ -209,12 +186,9 @@ fun LoginScreen(navController: NavController) {
                             currentUser.updateProfile(profileUpdates).await()
                         }
 
-                        // Lưu thông tin đăng nhập nếu được chọn
-                        saveCredentials()
-
                         navigateToHome()
                     } else {
-                        Toast.makeText(context, "Lỗi tải dữ liệu người dùng. Vui lòng thử lại.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Lỗi tải dữ liệu người dùng. Kiểm tra kết nối mạng.", Toast.LENGTH_LONG).show()
                     }
                 } else {
                     Toast.makeText(context, "Lỗi dữ liệu người dùng.", Toast.LENGTH_LONG).show()
@@ -224,9 +198,11 @@ fun LoginScreen(navController: NavController) {
                 Log.e("LoginScreen", "Đăng nhập thất bại", e)
                 val errorMessage = when {
                     e is FirebaseAuthInvalidCredentialsException -> "Sai mật khẩu. Vui lòng thử lại."
-                    e.message?.contains("network") == true -> "Lỗi kết nối mạng"
+                    e.message?.contains("network") == true -> "Lỗi kết nối mạng. Kiểm tra internet."
+                    e.message?.contains("timeout") == true -> "Kết nối quá chậm. Thử lại sau."
+                    e.message?.contains("backend") == true -> "Lỗi server. Thử lại sau vài phút."
                     e.message?.contains("too-many-requests") == true -> "Quá nhiều lần thử. Vui lòng đợi."
-                    else -> "Đăng nhập thất bại: Lỗi hệ thống."
+                    else -> "Đăng nhập thất bại. Kiểm tra kết nối mạng."
                 }
                 Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
             } finally {
@@ -291,7 +267,7 @@ fun LoginScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Remember Me Checkbox - TÍNH NĂNG LƯU TÀI KHOẢN
+        // Remember Me Checkbox
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -299,10 +275,7 @@ fun LoginScreen(navController: NavController) {
             Checkbox(
                 checked = rememberMe,
                 onCheckedChange = { rememberMe = it },
-                enabled = !isLoading && !isGoogleLoading,
-                colors = CheckboxDefaults.colors(
-                    checkedColor = Color(0xFF007AFF)
-                )
+                enabled = !isLoading && !isGoogleLoading
             )
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -312,27 +285,6 @@ fun LoginScreen(navController: NavController) {
                 fontSize = 14.sp,
                 color = Color.Gray
             )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Clear saved credentials button
-            if (sharedPrefs.getBoolean("remember_me", false)) {
-                TextButton(
-                    onClick = {
-                        sharedPrefs.edit().clear().apply()
-                        username = ""
-                        password = ""
-                        rememberMe = false
-                        Toast.makeText(context, "Đã xóa thông tin đã lưu", Toast.LENGTH_SHORT).show()
-                    }
-                ) {
-                    Text(
-                        text = "Xóa đã lưu",
-                        fontSize = 12.sp,
-                        color = Color.Red
-                    )
-                }
-            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
