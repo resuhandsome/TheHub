@@ -3,10 +3,6 @@ package com.example.thehub
 import java.text.SimpleDateFormat
 import java.util.*
 
-/**
- * Utility functions for TheHub app
- */
-
 fun formatTime(timestamp: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - timestamp

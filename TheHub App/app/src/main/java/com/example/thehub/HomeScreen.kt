@@ -1,4 +1,3 @@
-// GIỮ NGUYÊN TẤT CẢ IMPORTS VÀ DATA CLASS POST CỦA BẠN
 package com.example.thehub
 
 import android.widget.Toast
@@ -12,11 +11,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,28 +35,12 @@ import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-// GIỮ NGUYÊN DATA CLASS POST CỦA BẠN
-data class Post(
-    val id: String = "",
-    val authorId: String = "",
-    val author: String,
-    val authorAvatarUrl: String,
-    val time: String,
-    val content: String,
-    val imageUrls: List<String> = emptyList(),
-    val likes: Int = 0,
-    val likedBy: List<String> = emptyList(),
-    val comments: Int = 0,
-    val timestamp: Long = 0L
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController) {
     val currentUser = Firebase.auth.currentUser
     val defaultAvatar = R.drawable.logomacdinh
 
-    // GIỮ NGUYÊN TẤT CẢ FIREBASE LOGIC CỦA BẠN
     var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var currentUserProfile by remember { mutableStateOf<UserProfile?>(null) }
@@ -68,7 +48,6 @@ fun HomeScreen(navController: NavController) {
     val db = Firebase.firestore
     val context = LocalContext.current
 
-    // GIỮ NGUYÊN FIREBASE LOADING LOGIC
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             currentUserProfile = UserRepository.getCurrentUserProfile()
@@ -129,11 +108,10 @@ fun HomeScreen(navController: NavController) {
 
     Scaffold(
         topBar = {
-            // CHỈ SỬA COLORS, GIỮ NGUYÊN LAYOUT
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shadowElevation = 4.dp,
-                color = MaterialTheme.colorScheme.surface // ✅ Thay Color.White
+                color = MaterialTheme.colorScheme.surface
             ) {
                 Column(
                     modifier = Modifier
@@ -157,7 +135,7 @@ fun HomeScreen(navController: NavController) {
                             text = "TheHub",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface, // ✅ Thay Color(0xFF1A1A1A)
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.offset(y = 2.dp)
                         )
 
@@ -176,7 +154,7 @@ fun HomeScreen(navController: NavController) {
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant), // ✅ Thay Color.Gray.copy()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
                                 contentScale = ContentScale.Crop,
                                 placeholder = painterResource(id = defaultAvatar)
                             )
@@ -192,14 +170,14 @@ fun HomeScreen(navController: NavController) {
                             Text(
                                 "Tìm kiếm bài viết, người dùng...",
                                 fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant // ✅ Thay Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Search,
                                 contentDescription = "Search Icon",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thay Color.Gray
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.clickable {
                                     navController.navigate("search")
                                 }
@@ -207,68 +185,15 @@ fun HomeScreen(navController: NavController) {
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
-                            .clickable { navController.navigate("search") },
+                            .height(48.dp),
                         shape = RoundedCornerShape(24.dp),
                         colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, // ✅ Thay Color(0xFFF5F5F5)
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                             focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+                            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
                         ),
                         enabled = false
-                    )
-                }
-            }
-        },
-        bottomBar = {
-            // CHỈ SỬA COLORS, GIỮ NGUYÊN LAYOUT
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shadowElevation = 8.dp,
-                color = MaterialTheme.colorScheme.surface // ✅ Thay Color.White
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp)
-                        .navigationBarsPadding(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    BottomNavItem(
-                        icon = Icons.Default.Notifications,
-                        label = "Thông báo",
-                        isSelected = false,
-                        onClick = { navController.navigate("notifications") }
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .shadow(4.dp, CircleShape)
-                            .background(
-                                MaterialTheme.colorScheme.primary, // ✅ Thay Color(0xFF007AFF)
-                                CircleShape
-                            )
-                            .clickable { navController.navigate("compose_post") },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Add Post",
-                            tint = MaterialTheme.colorScheme.onPrimary, // ✅ Thay Color.White
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-
-                    BottomNavItem(
-                        icon = Icons.Default.Home,
-                        label = "Trang chủ",
-                        isSelected = true,
-                        onClick = { }
                     )
                 }
             }
@@ -277,7 +202,7 @@ fun HomeScreen(navController: NavController) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background) // ✅ Thay Color(0xFFFAFAFA)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             if (isLoading) {
                 Box(
@@ -285,7 +210,7 @@ fun HomeScreen(navController: NavController) {
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary, // ✅ Thay Color(0xFF007AFF)
+                        color = MaterialTheme.colorScheme.primary,
                         strokeWidth = 3.dp
                     )
                 }
@@ -307,52 +232,7 @@ fun HomeScreen(navController: NavController) {
 }
 
 @Composable
-fun BottomNavItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clickable { onClick() }
-            .padding(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .background(
-                    if (isSelected) MaterialTheme.colorScheme.primaryContainer // ✅ Thay Color(0xFF007AFF).copy()
-                    else androidx.compose.ui.graphics.Color.Transparent,
-                    RoundedCornerShape(20.dp)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (isSelected) MaterialTheme.colorScheme.primary // ✅ Thay Color(0xFF007AFF)
-                else MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thay Color.Gray
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = label,
-            fontSize = 10.sp,
-            color = if (isSelected) MaterialTheme.colorScheme.primary // ✅ Thay Color(0xFF007AFF)
-            else MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thay Color.Gray
-            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
-        )
-    }
-}
-
-@Composable
 fun PostItem(post: Post, navController: NavController) {
-    // GIỮ NGUYÊN TẤT CẢ FIREBASE LOGIC LIKE/UNLIKE CỦA BẠN
     var isLiked by remember { mutableStateOf(post.likedBy.contains(Firebase.auth.currentUser?.uid)) }
     var likeCount by remember { mutableStateOf(post.likes) }
     var showComments by remember { mutableStateOf(false) }
@@ -381,25 +261,6 @@ fun PostItem(post: Post, navController: NavController) {
                     )
                 ).await()
 
-                if (!isLiked && post.authorId != currentUser.uid) {
-                    val currentUserProfile = UserRepository.getCurrentUserProfile()
-                    if (currentUserProfile != null) {
-                        val notificationData = hashMapOf(
-                            "type" to "like",
-                            "fromUserId" to currentUser.uid,
-                            "fromUsername" to currentUserProfile.username,
-                            "fromUserAvatar" to currentUserProfile.avatarUrl,
-                            "toUserId" to post.authorId,
-                            "message" to "đã thích bài viết của bạn",
-                            "postId" to post.id,
-                            "timestamp" to System.currentTimeMillis(),
-                            "isRead" to false
-                        )
-
-                        db.collection("notifications").add(notificationData).await()
-                    }
-                }
-
                 isLiked = !isLiked
                 likeCount = newLikedBy.size
 
@@ -409,23 +270,13 @@ fun PostItem(post: Post, navController: NavController) {
         }
     }
 
-    fun sharePost() {
-        val shareIntent = android.content.Intent().apply {
-            action = android.content.Intent.ACTION_SEND
-            putExtra(android.content.Intent.EXTRA_TEXT, "${post.author}: ${post.content}")
-            type = "text/plain"
-        }
-        context.startActivity(android.content.Intent.createChooser(shareIntent, "Chia sẻ bài viết"))
-    }
-
-    // CHỈ SỬA COLORS, GIỮ NGUYÊN LAYOUT
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface // ✅ Thay Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -439,24 +290,15 @@ fun PostItem(post: Post, navController: NavController) {
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Box(
+                AsyncImage(
+                    model = post.authorAvatarUrl,
+                    contentDescription = "Author Avatar",
                     modifier = Modifier
                         .size(44.dp)
-                        .shadow(1.dp, CircleShape)
-                        .clickable {
-                            navController.navigate("profile/${post.authorId}")
-                        }
-                ) {
-                    AsyncImage(
-                        model = post.authorAvatarUrl,
-                        contentDescription = "Author Avatar",
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant), // ✅ Thay Color.Gray.copy()
-                        placeholder = painterResource(id = R.drawable.logomacdinh)
-                    )
-                }
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    placeholder = painterResource(id = R.drawable.logomacdinh)
+                )
 
                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -465,15 +307,12 @@ fun PostItem(post: Post, navController: NavController) {
                         text = post.author,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onSurface, // ✅ Thay Color(0xFF1A1A1A)
-                        modifier = Modifier.clickable {
-                            navController.navigate("profile/${post.authorId}")
-                        }
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = post.time,
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant // ✅ Thay Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -484,7 +323,7 @@ fun PostItem(post: Post, navController: NavController) {
                 text = post.content,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
-                color = MaterialTheme.colorScheme.onSurface // ✅ Thay Color(0xFF333333)
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             // Images
@@ -520,8 +359,8 @@ fun PostItem(post: Post, navController: NavController) {
                     Icon(
                         imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = "Like",
-                        tint = if (isLiked) MaterialTheme.colorScheme.error // ✅ Thay Color.Red
-                        else MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thay Color.Gray
+                        tint = if (isLiked) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(22.dp)
                     )
                     if (likeCount > 0) {
@@ -529,7 +368,7 @@ fun PostItem(post: Post, navController: NavController) {
                         Text(
                             text = likeCount.toString(),
                             fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thay Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -543,14 +382,14 @@ fun PostItem(post: Post, navController: NavController) {
                         painter = painterResource(id = R.drawable.iconbinhluan),
                         contentDescription = "Comment",
                         modifier = Modifier.size(22.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant // ✅ Thay Color.Gray
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (post.comments > 0) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = post.comments.toString(),
                             fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thay Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -561,14 +400,14 @@ fun PostItem(post: Post, navController: NavController) {
                     contentDescription = "Share",
                     modifier = Modifier
                         .size(22.dp)
-                        .clickable { sharePost() },
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant // ✅ Thay Color.Gray
+                        .clickable { /* Share logic */ },
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             if (showComments) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Divider(color = MaterialTheme.colorScheme.outline) // ✅ Thay Color.Gray.copy()
+                Divider(color = MaterialTheme.colorScheme.outline)
                 Spacer(modifier = Modifier.height(8.dp))
                 CommentSection(postId = post.id)
             }

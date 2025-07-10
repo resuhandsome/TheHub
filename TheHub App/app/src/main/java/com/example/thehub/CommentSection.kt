@@ -59,37 +59,16 @@ fun CommentSection(postId: String) {
                 .get()
                 .await()
 
-            val commentsList = mutableListOf<Comment>()
-
-            for (doc in commentsSnapshot.documents) {
-                val authorId = doc.getString("authorId") ?: ""
-                var authorName = doc.getString("authorName") ?: "Unknown User"
-                var authorAvatarUrl = doc.getString("authorAvatarUrl") ?: ""
-
-                // Load author profile if needed
-                if (authorName == "Unknown User" && authorId.isNotEmpty()) {
-                    try {
-                        val authorProfile = UserRepository.getUserProfile(authorId)
-                        if (authorProfile != null) {
-                            authorName = authorProfile.username
-                            authorAvatarUrl = authorProfile.avatarUrl
-                        }
-                    } catch (e: Exception) {
-                        // Keep default values
-                    }
-                }
-
-                val comment = Comment(
+            val commentsList = commentsSnapshot.documents.map { doc ->
+                Comment(
                     id = doc.id,
                     postId = doc.getString("postId") ?: "",
-                    authorId = authorId,
-                    authorName = authorName,
-                    authorAvatarUrl = authorAvatarUrl,
+                    authorId = doc.getString("authorId") ?: "",
+                    authorName = doc.getString("authorName") ?: "Unknown User",
+                    authorAvatarUrl = doc.getString("authorAvatarUrl") ?: "",
                     content = doc.getString("content") ?: "",
                     timestamp = doc.getLong("timestamp") ?: 0L
                 )
-
-                commentsList.add(comment)
             }
 
             comments = commentsList
@@ -101,12 +80,61 @@ fun CommentSection(postId: String) {
         }
     }
 
+    fun addComment() {
+        if (newComment.isBlank() || currentUser == null || isSubmitting) return
+
+        isSubmitting = true
+        coroutineScope.launch {
+            try {
+                val userProfile = UserRepository.getCurrentUserProfile()
+
+                val commentData = hashMapOf(
+                    "postId" to postId,
+                    "authorId" to currentUser.uid,
+                    "authorName" to (userProfile?.username ?: currentUser.displayName ?: "Unknown User"),
+                    "authorAvatarUrl" to (userProfile?.avatarUrl ?: currentUser.photoUrl?.toString() ?: ""),
+                    "content" to newComment.trim(),
+                    "timestamp" to System.currentTimeMillis()
+                )
+
+                // Add comment
+                val commentRef = db.collection("comments").add(commentData).await()
+
+                // Update post comment count
+                val postRef = db.collection("posts").document(postId)
+                db.runTransaction { transaction ->
+                    val post = transaction.get(postRef)
+                    val currentComments = post.getLong("comments") ?: 0
+                    transaction.update(postRef, "comments", currentComments + 1)
+                }.await()
+
+                // Add new comment to local list
+                val newCommentObj = Comment(
+                    id = commentRef.id,
+                    postId = postId,
+                    authorId = currentUser.uid,
+                    authorName = userProfile?.username ?: currentUser.displayName ?: "Unknown User",
+                    authorAvatarUrl = userProfile?.avatarUrl ?: currentUser.photoUrl?.toString() ?: "",
+                    content = newComment.trim(),
+                    timestamp = System.currentTimeMillis()
+                )
+
+                comments = listOf(newCommentObj) + comments
+                newComment = ""
+
+            } catch (e: Exception) {
+                // Handle error
+            } finally {
+                isSubmitting = false
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
     ) {
-        // Comments list
         if (isLoading) {
             Box(
                 modifier = Modifier
@@ -169,70 +197,12 @@ fun CommentSection(postId: String) {
                 Spacer(modifier = Modifier.width(8.dp))
 
                 IconButton(
-                    onClick = {
-                        if (newComment.isNotBlank() && !isSubmitting) {
-                            coroutineScope.launch {
-                                isSubmitting = true
-                                try {
-                                    val currentUserProfile = UserRepository.getCurrentUserProfile()
-
-                                    val commentData = hashMapOf(
-                                        "postId" to postId,
-                                        "authorId" to currentUser.uid,
-                                        "authorName" to (currentUserProfile?.username ?: currentUser.displayName ?: "Unknown User"),
-                                        "authorAvatarUrl" to (currentUserProfile?.avatarUrl ?: currentUser.photoUrl?.toString() ?: ""),
-                                        "content" to newComment.trim(),
-                                        "timestamp" to System.currentTimeMillis()
-                                    )
-
-                                    db.collection("comments").add(commentData).await()
-
-                                    // Update post comment count
-                                    val postRef = db.collection("posts").document(postId)
-                                    db.runTransaction { transaction ->
-                                        val post = transaction.get(postRef)
-                                        val currentComments = post.getLong("comments") ?: 0
-                                        transaction.update(postRef, "comments", currentComments + 1)
-                                    }.await()
-
-                                    newComment = ""
-
-                                    // Reload comments
-                                    val updatedCommentsSnapshot = db.collection("comments")
-                                        .whereEqualTo("postId", postId)
-                                        .orderBy("timestamp", Query.Direction.DESCENDING)
-                                        .get()
-                                        .await()
-
-                                    val updatedCommentsList = mutableListOf<Comment>()
-                                    for (doc in updatedCommentsSnapshot.documents) {
-                                        val comment = Comment(
-                                            id = doc.id,
-                                            postId = doc.getString("postId") ?: "",
-                                            authorId = doc.getString("authorId") ?: "",
-                                            authorName = doc.getString("authorName") ?: "Unknown User",
-                                            authorAvatarUrl = doc.getString("authorAvatarUrl") ?: "",
-                                            content = doc.getString("content") ?: "",
-                                            timestamp = doc.getLong("timestamp") ?: 0L
-                                        )
-                                        updatedCommentsList.add(comment)
-                                    }
-
-                                    comments = updatedCommentsList
-
-                                } catch (e: Exception) {
-                                    // Handle error
-                                } finally {
-                                    isSubmitting = false
-                                }
-                            }
-                        }
-                    },
+                    onClick = { addComment() },
                     enabled = newComment.isNotBlank() && !isSubmitting,
                     modifier = Modifier
                         .size(40.dp)
                         .background(
-                            if (newComment.isNotBlank()) MaterialTheme.colorScheme.primary
+                            if (newComment.isNotBlank() && !isSubmitting) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.surfaceVariant,
                             CircleShape
                         )

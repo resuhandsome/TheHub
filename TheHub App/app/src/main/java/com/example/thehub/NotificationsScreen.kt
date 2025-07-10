@@ -1,6 +1,5 @@
 package com.example.thehub
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,13 +8,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -25,14 +23,15 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-data class NotificationItem(
+data class Notification(
     val id: String = "",
-    val type: String = "",
+    val type: String = "", // "like", "comment", "follow", "mention"
     val fromUserId: String = "",
     val fromUsername: String = "",
     val fromUserAvatar: String = "",
@@ -40,149 +39,95 @@ data class NotificationItem(
     val message: String = "",
     val postId: String = "",
     val timestamp: Long = 0L,
-    val isRead: Boolean = false
+    var isRead: Boolean = false
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationsScreen(navController: NavController) {
-    var notifications by remember { mutableStateOf<List<NotificationItem>>(emptyList()) }
+    var notifications by remember { mutableStateOf<List<Notification>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var selectedTab by remember { mutableStateOf("All") }
-    var errorMessage by remember { mutableStateOf("") }
+    var hasUnread by remember { mutableStateOf(false) }
 
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     val currentUser = Firebase.auth.currentUser
     val db = Firebase.firestore
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
-    // Load notifications với error handling tốt hơn
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             try {
-                isLoading = true
-                errorMessage = ""
-
-                println("DEBUG: Loading notifications for user: ${currentUser.uid}")
-
-                // Query đơn giản không dùng orderBy để tránh index
                 val notificationsSnapshot = db.collection("notifications")
                     .whereEqualTo("toUserId", currentUser.uid)
+                    .orderBy("timestamp", Query.Direction.DESCENDING)
+                    .limit(50)
                     .get()
                     .await()
 
-                println("DEBUG: Found ${notificationsSnapshot.size()} notifications")
+                val notificationsList = notificationsSnapshot.documents.map { doc ->
+                    Notification(
+                        id = doc.id,
+                        type = doc.getString("type") ?: "",
+                        fromUserId = doc.getString("fromUserId") ?: "",
+                        fromUsername = doc.getString("fromUsername") ?: "Unknown User",
+                        fromUserAvatar = doc.getString("fromUserAvatar") ?: "",
+                        toUserId = doc.getString("toUserId") ?: "",
+                        message = doc.getString("message") ?: "",
+                        postId = doc.getString("postId") ?: "",
+                        timestamp = doc.getLong("timestamp") ?: 0L,
+                        isRead = doc.getBoolean("isRead") ?: false
+                    )
+                }
 
-                notifications = notificationsSnapshot.documents.mapNotNull { doc ->
-                    try {
-                        NotificationItem(
-                            id = doc.id,
-                            type = doc.getString("type") ?: "",
-                            fromUserId = doc.getString("fromUserId") ?: "",
-                            fromUsername = doc.getString("fromUsername") ?: "",
-                            fromUserAvatar = doc.getString("fromUserAvatar") ?: "",
-                            toUserId = doc.getString("toUserId") ?: "",
-                            message = doc.getString("message") ?: "",
-                            postId = doc.getString("postId") ?: "",
-                            timestamp = doc.getLong("timestamp") ?: 0L,
-                            isRead = doc.getBoolean("isRead") ?: false
-                        )
-                    } catch (e: Exception) {
-                        println("DEBUG: Error parsing notification - ${e.message}")
-                        null
-                    }
-                }.sortedByDescending { it.timestamp }
-
-                println("DEBUG: Successfully loaded ${notifications.size} notifications")
+                notifications = notificationsList
+                hasUnread = notificationsList.any { !it.isRead }
 
             } catch (e: Exception) {
-                errorMessage = "Lỗi khi tải thông báo: ${e.message}"
-                println("DEBUG: Error loading notifications - ${e.message}")
-
-                // Tạo mock notifications nếu không có dữ liệu để test UI
-                if (notifications.isEmpty()) {
-                    notifications = createMockNotifications(currentUser.uid)
-                }
+                // Handle error
             } finally {
                 isLoading = false
             }
-        } else {
-            errorMessage = "Chưa đăng nhập"
-            isLoading = false
         }
     }
 
-    fun retryLoadNotifications() {
-        coroutineScope.launch {
-            if (currentUser != null) {
+    fun markAsRead(notification: Notification) {
+        if (!notification.isRead) {
+            coroutineScope.launch {
                 try {
-                    isLoading = true
-                    errorMessage = ""
-
-                    val notificationsSnapshot = db.collection("notifications")
-                        .whereEqualTo("toUserId", currentUser.uid)
-                        .get()
+                    db.collection("notifications")
+                        .document(notification.id)
+                        .update("isRead", true)
                         .await()
 
-                    notifications = notificationsSnapshot.documents.mapNotNull { doc ->
-                        try {
-                            NotificationItem(
-                                id = doc.id,
-                                type = doc.getString("type") ?: "",
-                                fromUserId = doc.getString("fromUserId") ?: "",
-                                fromUsername = doc.getString("fromUsername") ?: "",
-                                fromUserAvatar = doc.getString("fromUserAvatar") ?: "",
-                                toUserId = doc.getString("toUserId") ?: "",
-                                message = doc.getString("message") ?: "",
-                                postId = doc.getString("postId") ?: "",
-                                timestamp = doc.getLong("timestamp") ?: 0L,
-                                isRead = doc.getBoolean("isRead") ?: false
-                            )
-                        } catch (e: Exception) {
-                            null
-                        }
-                    }.sortedByDescending { it.timestamp }
+                    notifications = notifications.map {
+                        if (it.id == notification.id) it.copy(isRead = true) else it
+                    }
+                    hasUnread = notifications.any { !it.isRead }
 
                 } catch (e: Exception) {
-                    errorMessage = "Lỗi khi tải thông báo: ${e.message}"
-                    Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
-                } finally {
-                    isLoading = false
+                    // Handle error
                 }
             }
         }
     }
 
-    fun toggleFollow(userId: String) {
+    fun markAllAsRead() {
         coroutineScope.launch {
             try {
-                if (currentUser != null) {
-                    val followDoc = db.collection("follows")
-                        .whereEqualTo("followerId", currentUser.uid)
-                        .whereEqualTo("followingId", userId)
-                        .get()
-                        .await()
+                val batch = db.batch()
 
-                    if (followDoc.isEmpty) {
-                        // Follow
-                        val followData = hashMapOf(
-                            "followerId" to currentUser.uid,
-                            "followingId" to userId,
-                            "timestamp" to System.currentTimeMillis()
-                        )
-
-                        db.collection("follows").add(followData).await()
-                        Toast.makeText(context, "Đã theo dõi", Toast.LENGTH_SHORT).show()
-                    } else {
-                        // Unfollow
-                        followDoc.documents.forEach { doc ->
-                            db.collection("follows").document(doc.id).delete().await()
-                        }
-                        Toast.makeText(context, "Đã hủy theo dõi", Toast.LENGTH_SHORT).show()
-                    }
+                notifications.filter { !it.isRead }.forEach { notification ->
+                    val docRef = db.collection("notifications").document(notification.id)
+                    batch.update(docRef, "isRead", true)
                 }
+
+                batch.commit().await()
+
+                notifications = notifications.map { it.copy(isRead = true) }
+                hasUnread = false
+
             } catch (e: Exception) {
-                Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_SHORT).show()
+                // Handle error
             }
         }
     }
@@ -194,67 +139,46 @@ fun NotificationsScreen(navController: NavController) {
                     Text(
                         "Thông báo",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                actions = {
+                    if (hasUnread) {
+                        TextButton(
+                            onClick = { markAllAsRead() },
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text("Đọc tất cả")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color.White)
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            // Tab buttons
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                listOf("All", "Comment reply", "Followers", "Likes").forEach { tab ->
-                    FilterChip(
-                        onClick = { selectedTab = tab },
-                        label = {
-                            Text(
-                                tab,
-                                fontSize = 14.sp,
-                                color = if (selectedTab == tab) Color.White else Color.Gray
-                            )
-                        },
-                        selected = selectedTab == tab,
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFF007AFF),
-                            containerColor = Color(0xFFF0F0F0)
-                        )
-                    )
-                }
-            }
-
-            Divider(color = Color(0xFFE0E0E0), thickness = 0.5.dp)
-
-            // Content area
             when {
                 isLoading -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = Color(0xFF007AFF))
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
 
-                errorMessage.isNotEmpty() && notifications.isEmpty() -> {
-                    // Error state
+                notifications.isEmpty() -> {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -262,78 +186,53 @@ fun NotificationsScreen(navController: NavController) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Text(text = "⚠️", fontSize = 48.sp)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Không thể tải thông báo",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1A1A1A)
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = "No Notifications",
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.outline
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = errorMessage,
-                            fontSize = 14.sp,
-                            color = Color(0xFF666666)
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Button(
-                            onClick = { retryLoadNotifications() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF007AFF)
-                            )
-                        ) {
-                            Text("Thử lại")
-                        }
-                    }
-                }
 
-                notifications.isEmpty() -> {
-                    // Empty state
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(text = "🔔", fontSize = 48.sp)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Chưa có thông báo nào",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF1A1A1A)
-                            )
-                            Text(
-                                text = "Thông báo sẽ xuất hiện ở đây",
-                                fontSize = 14.sp,
-                                color = Color(0xFF666666)
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = "Chưa có thông báo nào",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+
+                        Text(
+                            text = "Thông báo về lượt thích, bình luận và người theo dõi mới sẽ xuất hiện ở đây",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
                     }
                 }
 
                 else -> {
-                    // Notifications list
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(vertical = 8.dp)
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(1.dp)
                     ) {
-                        val filteredNotifications = notifications.filter {
-                            when (selectedTab) {
-                                "Comment reply" -> it.type == "comment"
-                                "Followers" -> it.type == "follow"
-                                "Likes" -> it.type == "like"
-                                else -> true
-                            }
-                        }
-
-                        items(filteredNotifications) { notification ->
-                            NotificationItemView(
+                        items(notifications) { notification ->
+                            NotificationItem(
                                 notification = notification,
-                                onFollowClick = { userId ->
-                                    toggleFollow(userId)
+                                onClick = {
+                                    markAsRead(notification)
+
+                                    when (notification.type) {
+                                        "like", "comment" -> {
+                                            if (notification.postId.isNotEmpty()) {
+                                                navController.navigate("post/${notification.postId}")
+                                            }
+                                        }
+                                        "follow" -> {
+                                            navController.navigate("profile/${notification.fromUserId}")
+                                        }
+                                    }
                                 }
                             )
                         }
@@ -345,165 +244,104 @@ fun NotificationsScreen(navController: NavController) {
 }
 
 @Composable
-fun NotificationItemView(
-    notification: NotificationItem,
-    onFollowClick: (String) -> Unit
+fun NotificationItem(
+    notification: Notification,
+    onClick: () -> Unit
 ) {
-    var isFollowing by remember { mutableStateOf(false) }
-    val currentUser = Firebase.auth.currentUser
-    val db = Firebase.firestore
-    val coroutineScope = rememberCoroutineScope()
-
-    // Check if already following
-    LaunchedEffect(notification.fromUserId) {
-        if (currentUser != null && notification.type == "follow") {
-            try {
-                val followDoc = db.collection("follows")
-                    .whereEqualTo("followerId", currentUser.uid)
-                    .whereEqualTo("followingId", notification.fromUserId)
-                    .get()
-                    .await()
-
-                isFollowing = !followDoc.isEmpty
-            } catch (e: Exception) {
-                // Handle error silently
-            }
-        }
-    }
-
-    Row(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (!notification.isRead)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            else MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        // Avatar
-        AsyncImage(
-            model = notification.fromUserAvatar.takeIf { it.isNotEmpty() },
-            contentDescription = "User Avatar",
+        Row(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape),
-            contentScale = ContentScale.Crop,
-            placeholder = painterResource(id = R.drawable.logomacdinh)
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        // Content
-        Column(
-            modifier = Modifier.weight(1f)
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = notification.fromUsername,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = Color.Black
-                )
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                Text(
-                    text = getNotificationMessage(notification.type),
-                    fontSize = 14.sp,
-                    color = Color.Black
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = formatTime(notification.timestamp),
-                fontSize = 12.sp,
-                color = Color.Gray
+            AsyncImage(
+                model = notification.fromUserAvatar,
+                contentDescription = "User Avatar",
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(id = R.drawable.logomacdinh)
             )
-        }
 
-        // Action button
-        when (notification.type) {
-            "follow" -> {
-                Button(
-                    onClick = {
-                        onFollowClick(notification.fromUserId)
-                        isFollowing = !isFollowing
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isFollowing) Color(0xFFE0E0E0) else Color(0xFF007AFF)
-                    ),
-                    shape = RoundedCornerShape(20.dp),
-                    modifier = Modifier
-                        .height(32.dp)
-                        .widthIn(min = 80.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (isFollowing) "Đang theo dõi" else "Theo dõi",
-                        fontSize = 12.sp,
-                        color = if (isFollowing) Color.Gray else Color.White,
-                        fontWeight = FontWeight.Medium
+                        text = notification.fromUsername,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    Text(
+                        text = notification.message,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = formatTime(notification.timestamp),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            "like", "comment" -> {
-                // Post thumbnail
+
+            val icon = when (notification.type) {
+                "like" -> Icons.Default.Favorite
+                "comment" -> Icons.Default.Chat
+                "follow" -> Icons.Default.PersonAdd
+                "mention" -> Icons.Default.AlternateEmail
+                else -> Icons.Default.Notifications
+            }
+
+            val iconColor = when (notification.type) {
+                "like" -> MaterialTheme.colorScheme.error
+                "comment" -> MaterialTheme.colorScheme.primary
+                "follow" -> MaterialTheme.colorScheme.secondary
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+
+            Icon(
+                imageVector = icon,
+                contentDescription = notification.type,
+                tint = iconColor,
+                modifier = Modifier.size(20.dp)
+            )
+
+            if (!notification.isRead) {
+                Spacer(modifier = Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .background(Color(0xFFF0F0F0), RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painter = painterResource(
-                            id = if (notification.type == "like")
-                                R.drawable.iconbinhluan else R.drawable.iconchiase
-                        ),
-                        contentDescription = "Post",
-                        modifier = Modifier.size(20.dp),
-                        tint = Color.Gray
-                    )
-                }
+                        .size(8.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            CircleShape
+                        )
+                )
             }
         }
     }
-}
-
-fun getNotificationMessage(type: String): String {
-    return when (type) {
-        "like" -> "đã thích bài viết của bạn"
-        "comment" -> "đã bình luận bài viết của bạn"
-        "follow" -> "đã theo dõi bạn"
-        "mention" -> "đã nhắc đến bạn"
-        else -> "có hoạt động mới"
-    }
-}
-
-// Function để tạo mock notifications cho testing
-fun createMockNotifications(currentUserId: String): List<NotificationItem> {
-    return listOf(
-        NotificationItem(
-            id = "mock1",
-            type = "follow",
-            fromUserId = "user123",
-            fromUsername = "john_doe",
-            fromUserAvatar = "",
-            toUserId = currentUserId,
-            message = "đã theo dõi bạn",
-            timestamp = System.currentTimeMillis() - 3600000,
-            isRead = false
-        ),
-        NotificationItem(
-            id = "mock2",
-            type = "like",
-            fromUserId = "user456",
-            fromUsername = "jane_smith",
-            fromUserAvatar = "",
-            toUserId = currentUserId,
-            message = "đã thích bài viết của bạn",
-            timestamp = System.currentTimeMillis() - 7200000,
-            isRead = false
-        )
-    )
 }
