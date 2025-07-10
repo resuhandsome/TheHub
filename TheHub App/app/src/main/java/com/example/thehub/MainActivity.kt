@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,26 +17,18 @@ import com.example.thehub.ui.theme.TheHubTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Initialize ThemeManager
         ThemeManager.initialize(this)
 
         setContent {
-            val context = LocalContext.current
+            val ctx = LocalContext.current
+            LaunchedEffect(Unit) { ThemeManager.initialize(ctx) }
 
-            // Initialize theme on first launch
-            LaunchedEffect(Unit) {
-                ThemeManager.initialize(context)
-            }
-
-            TheHubTheme(
-                darkTheme = ThemeManager.isDarkMode
-            ) {
+            TheHubTheme(darkTheme = ThemeManager.isDarkMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = ThemeManager.getBackgroundColor()
                 ) {
-                    AppNavigation()
+                    AppNav()
                 }
             }
         }
@@ -45,54 +36,24 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavigation() {
-    val navController = rememberNavController()
-
-    NavHost(navController = navController, startDestination = "login") {
-        composable("login") {
-            LoginScreen(navController = navController)
+fun AppNav() {
+    val nav = rememberNavController()
+    NavHost(nav, startDestination = "login") {
+        composable("login")           { LoginScreen(nav) }
+        composable("signup")          { SignUpScreen(nav) }
+        composable("home")            { HomeScreen(nav) }
+        composable("compose_post")    { ComposePostScreen(nav) }
+        composable("search")          { SearchScreen(nav) }
+        composable("notifications")   { NotificationsScreen(nav) }
+        composable("messages")        { ConversationsScreen(nav) }
+        composable("chat/{cid}")      { back ->
+            ChatScreen(nav, back.arguments?.getString("cid") ?: "")
         }
-
-        composable("signup") {
-            SignUpScreen(navController = navController)
+        composable("profile")         { ProfileScreen(nav) }
+        composable("profile/{uid}")   { back ->
+            ProfileScreen(nav, back.arguments?.getString("uid"))
         }
-
-        composable("home") {
-            HomeScreen(navController = navController)
-        }
-
-        composable("compose_post") {
-            ComposePostScreen(navController = navController)
-        }
-
-        composable("search") {
-            SearchScreen(navController = navController)
-        }
-
-        composable("notifications") {
-            NotificationsScreen(navController = navController)
-        }
-
-        composable("profile") {
-            ProfileScreen(navController = navController)
-        }
-
-        composable("profile/{userId}") { backStackEntry ->
-            val userId = backStackEntry.arguments?.getString("userId")
-            ProfileScreen(navController = navController, userId = userId)
-        }
-
-        composable("edit_profile") {
-            EditProfileScreen(navController = navController)
-        }
-
-        composable("settings") {
-            SettingsScreen(navController = navController)
-        }
-
-        composable("favourites") {
-            FavouritesScreen(navController = navController)
-        }
-
+        composable("edit_profile")    { EditProfileScreen(nav) }
+        composable("favourites")      { FavouritesScreen(nav) }
     }
 }

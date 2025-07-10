@@ -44,8 +44,16 @@ android {
 }
 
 dependencies {
+    // Compose BOM
+    implementation (platform("androidx.compose:compose-bom:2024.02.00"))
+    implementation ("androidx.compose.ui:ui")
+    implementation ("androidx.compose.ui:ui-tooling-preview")
+    implementation ("androidx.compose.material3:material3")
 
-    
+    // ViewModel Compose
+    implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation ("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
+
     //lưu tai khoan
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
@@ -89,6 +97,12 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.5.4")
     implementation ("androidx.compose.material3:material3:1.3.2")
     implementation ("androidx.navigation:navigation-compose:2.7.7")
+    implementation ("androidx.compose.material3:material3:1.3.2")
+    implementation ("androidx.navigation:navigation-compose:2.7.7")
+    implementation ("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.2")
+    implementation ("com.google.firebase:firebase-firestore-ktx:25.0.0")
+    implementation ("com.google.firebase:firebase-auth-ktx:23.0.0")
+    implementation ("com.google.accompanist:accompanist-systemuicontroller:0.33.2-beta")
 
     // Testing
     testImplementation(libs.junit)

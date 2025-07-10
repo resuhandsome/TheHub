@@ -11,12 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +26,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.ktx.auth
@@ -39,20 +35,6 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-
-data class Post(
-    val id: String = "",
-    val authorId: String = "",
-    val author: String,
-    val authorAvatarUrl: String,
-    val time: String,
-    val content: String,
-    val imageUrls: List<String> = emptyList(),
-    val likes: Int = 0,
-    val likedBy: List<String> = emptyList(),
-    val comments: Int = 0,
-    val timestamp: Long = 0L
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,9 +45,11 @@ fun HomeScreen(navController: NavController) {
     var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var currentUserProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
 
     val db = Firebase.firestore
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     // Theme-aware colors
     val backgroundColor = ThemeManager.getBackgroundColor()
@@ -138,6 +122,13 @@ fun HomeScreen(navController: NavController) {
         }
     }
 
+    // Handle search
+    fun handleSearch() {
+        if (searchQuery.isNotEmpty()) {
+            navController.navigate("search")
+        }
+    }
+
     Scaffold(
         topBar = {
             // Top Bar với theme-aware colors
@@ -198,10 +189,10 @@ fun HomeScreen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Thanh tìm kiếm
+                    // Thanh tìm kiếm - FUNCTIONAL
                     TextField(
-                        value = "",
-                        onValueChange = { },
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
                         placeholder = {
                             Text(
                                 "Tìm kiếm bài viết, người dùng...",
@@ -214,76 +205,34 @@ fun HomeScreen(navController: NavController) {
                                 Icons.Default.Search,
                                 contentDescription = "Search Icon",
                                 tint = iconColor,
-                                modifier = Modifier.clickable {
-                                    navController.navigate("search")
-                                }
+                                modifier = Modifier.clickable { handleSearch() }
                             )
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
-                            .clickable { navController.navigate("search") },
+                            .height(48.dp),
                         shape = RoundedCornerShape(24.dp),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
                             unfocusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
-                            disabledContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
-                            disabledIndicatorColor = Color.Transparent
+                            focusedTextColor = textColor,
+                            unfocusedTextColor = textColor
                         ),
-                        enabled = false
+                        singleLine = true,
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                            onSearch = { handleSearch() }
+                        ),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default.copy(
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Search
+                        )
                     )
                 }
             }
         },
         bottomBar = {
-            // Bottom Navigation với theme-aware colors
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shadowElevation = 8.dp,
-                color = surfaceColor
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp)
-                        .navigationBarsPadding(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    BottomNavItem(
-                        icon = Icons.Default.Notifications,
-                        label = "Thông báo",
-                        isSelected = false,
-                        onClick = { navController.navigate("notifications") }
-                    )
-
-                    // Add Post Button
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .shadow(4.dp, CircleShape)
-                            .background(accentColor, CircleShape)
-                            .clickable { navController.navigate("compose_post") },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Add Post",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-
-                    BottomNavItem(
-                        icon = Icons.Default.Home,
-                        label = "Trang chủ",
-                        isSelected = true,
-                        onClick = { }
-                    )
-                }
-            }
+            TheHubBottomBar(navController, current = "home")
         }
     ) { paddingValues ->
         // Content area
@@ -315,6 +264,77 @@ fun HomeScreen(navController: NavController) {
                     }
                 }
             }
+        }
+    }
+}
+
+// Bottom Navigation Bar Component
+@Composable
+fun TheHubBottomBar(navController: NavController, current: String) {
+    val accentColor = ThemeManager.getAccentColor()
+    val surfaceColor = ThemeManager.getSurfaceColor()
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shadowElevation = 8.dp,
+        color = surfaceColor
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .navigationBarsPadding(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Home
+            BottomNavItem(
+                icon = Icons.Default.Home,
+                label = "Trang chủ",
+                isSelected = current == "home",
+                onClick = { navController.navigate("home") }
+            )
+
+            // Messages
+            BottomNavItem(
+                icon = Icons.Default.Message,
+                label = "Tin nhắn",
+                isSelected = current == "messages",
+                onClick = { navController.navigate("messages") }
+            )
+
+            // Add Post Button (Center)
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .shadow(4.dp, CircleShape)
+                    .background(accentColor, CircleShape)
+                    .clickable { navController.navigate("compose_post") },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Add Post",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            // Notifications
+            BottomNavItem(
+                icon = Icons.Default.Notifications,
+                label = "Thông báo",
+                isSelected = current == "notifications",
+                onClick = { navController.navigate("notifications") }
+            )
+
+            // Profile
+            BottomNavItem(
+                icon = Icons.Default.Person,
+                label = "Profile",
+                isSelected = current == "profile",
+                onClick = { navController.navigate("profile") }
+            )
         }
     }
 }
