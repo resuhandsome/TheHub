@@ -1,13 +1,15 @@
 package com.example.thehub
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -17,12 +19,29 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            TheHubTheme {
+            val context = LocalContext.current
+            var isDarkMode by remember { mutableStateOf(false) }
+
+            // Load theme preference từ SharedPreferences
+            LaunchedEffect(Unit) {
+                val sharedPrefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+                isDarkMode = sharedPrefs.getBoolean("dark_mode", false)
+            }
+
+            TheHubTheme(darkTheme = isDarkMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavigation()
+                    AppNavigation(
+                        isDarkMode = isDarkMode,
+                        onThemeChange = { newDarkMode ->
+                            isDarkMode = newDarkMode
+                            // Lưu theme preference
+                            val sharedPrefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+                            sharedPrefs.edit().putBoolean("dark_mode", newDarkMode).apply()
+                        }
+                    )
                 }
             }
         }
@@ -30,7 +49,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    isDarkMode: Boolean,
+    onThemeChange: (Boolean) -> Unit
+) {
     val navController = rememberNavController()
 
     NavHost(navController = navController, startDestination = "login") {
@@ -71,12 +93,13 @@ fun AppNavigation() {
             EditProfileScreen(navController = navController)
         }
 
-        composable("settings") {
-            SettingsScreen(navController = navController)
-        }
 
-        composable("favourites") {
-            FavouritesScreen(navController = navController)
+        composable("settings") {
+            SettingsScreen(
+                navController = navController,
+                isDarkMode = isDarkMode,
+                onThemeChange = onThemeChange
+            )
         }
     }
 }

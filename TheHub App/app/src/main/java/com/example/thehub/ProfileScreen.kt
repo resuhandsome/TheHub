@@ -270,7 +270,7 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                 },
                 actions = {
                     if (isOwnProfile) {
-                        IconButton(onClick = { navController.navigate("settings") }) {
+                        IconButton(onClick = { /* TODO: Settings */ }) {
                             Icon(Icons.Default.Settings, contentDescription = "Settings")
                         }
                     } else {

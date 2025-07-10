@@ -31,11 +31,14 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(navController: NavController) {
+fun SettingsScreen(
+    navController: NavController,
+    isDarkMode: Boolean,
+    onThemeChange: (Boolean) -> Unit
+) {
     var currentUserProfile by remember { mutableStateOf<UserProfile?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var showLogoutDialog by remember { mutableStateOf(false) }
-    var isDarkMode by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -59,7 +62,6 @@ fun SettingsScreen(navController: NavController) {
         coroutineScope.launch {
             try {
                 Firebase.auth.signOut()
-                UserPreferences.clearSavedCredentials(context)
                 Toast.makeText(context, "Đã đăng xuất thành công", Toast.LENGTH_SHORT).show()
                 navController.navigate("login") {
                     popUpTo(0) { inclusive = true }
@@ -120,7 +122,7 @@ fun SettingsScreen(navController: NavController) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = if (isDarkMode) Color(0xFF1E1E1E) else Color.White
                 )
             )
         }
@@ -129,7 +131,7 @@ fun SettingsScreen(navController: NavController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFFFAFAFA))
+                .background(if (isDarkMode) Color(0xFF121212) else Color(0xFFFAFAFA))
                 .verticalScroll(scrollState)
                 .padding(16.dp)
         ) {
@@ -146,116 +148,85 @@ fun SettingsScreen(navController: NavController) {
             } else {
                 UserProfileSection(
                     userProfile = currentUserProfile,
+                    isDarkMode = isDarkMode,
                     onEditClick = { navController.navigate("edit_profile") }
                 )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Main Settings Section
-            SettingsSection(title = "Cài đặt chính") {
-                SettingItem(
-                    icon = Icons.Default.Favorite,
-                    title = "Favourite",
-                    subtitle = "Xem các bài viết đã thích",
-                    onClick = { navController.navigate("favourites") }
+            // Theme Settings Section
+            SettingsSection(
+                title = "Giao diện",
+                isDarkMode = isDarkMode
+            ) {
+                ThemeSettingItem(
+                    isDarkMode = isDarkMode,
+                    onThemeChange = onThemeChange
                 )
+            }
 
-                Divider(color = Color(0xFFE0E0E0))
+            Spacer(modifier = Modifier.height(16.dp))
 
+            // Account Settings Section
+            SettingsSection(
+                title = "Tài khoản",
+                isDarkMode = isDarkMode
+            ) {
                 SettingItem(
                     icon = Icons.Default.Person,
                     title = "Chỉnh sửa hồ sơ",
                     subtitle = "Thay đổi thông tin cá nhân",
+                    isDarkMode = isDarkMode,
                     onClick = { navController.navigate("edit_profile") }
                 )
 
-                Divider(color = Color(0xFFE0E0E0))
-
-                ThemeSettingItem(
-                    isDarkMode = isDarkMode,
-                    onThemeChange = { isDarkMode = it }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Privacy & Security Section
-            SettingsSection(title = "Quyền riêng tư & Bảo mật") {
                 SettingItem(
                     icon = Icons.Default.Lock,
                     title = "Quyền riêng tư",
                     subtitle = "Quản lý quyền riêng tư tài khoản",
+                    isDarkMode = isDarkMode,
                     onClick = { /* TODO: Privacy settings */ }
                 )
 
-                Divider(color = Color(0xFFE0E0E0))
-
-                SettingItem(
-                    icon = Icons.Default.Security,
-                    title = "Bảo mật",
-                    subtitle = "Mật khẩu và xác thực",
-                    onClick = { /* TODO: Security settings */ }
-                )
-
-                Divider(color = Color(0xFFE0E0E0))
-
-                SettingItem(
-                    icon = Icons.Default.Block,
-                    title = "Tài khoản bị chặn",
-                    subtitle = "Quản lý danh sách chặn",
-                    onClick = { /* TODO: Blocked accounts */ }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Notifications Section
-            SettingsSection(title = "Thông báo") {
                 SettingItem(
                     icon = Icons.Default.Notifications,
-                    title = "Thông báo push",
-                    subtitle = "Cài đặt thông báo đẩy",
+                    title = "Thông báo",
+                    subtitle = "Cài đặt thông báo",
+                    isDarkMode = isDarkMode,
                     onClick = { navController.navigate("notifications") }
-                )
-
-                Divider(color = Color(0xFFE0E0E0))
-
-                SettingItem(
-                    icon = Icons.Default.Email,
-                    title = "Thông báo email",
-                    subtitle = "Nhận thông báo qua email",
-                    onClick = { /* TODO: Email notifications */ }
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // Support Section
-            SettingsSection(title = "Hỗ trợ") {
+            SettingsSection(
+                title = "Hỗ trợ",
+                isDarkMode = isDarkMode
+            ) {
                 SettingItem(
                     icon = Icons.Default.Help,
                     title = "Trợ giúp",
                     subtitle = "Câu hỏi thường gặp",
+                    isDarkMode = isDarkMode,
                     onClick = { /* TODO: Help */ }
                 )
-
-                Divider(color = Color(0xFFE0E0E0))
 
                 SettingItem(
                     icon = Icons.Default.Info,
                     title = "Về TheHub",
                     subtitle = "Phiên bản 1.0.0",
+                    isDarkMode = isDarkMode,
                     onClick = { /* TODO: About */ }
                 )
 
-                Divider(color = Color(0xFFE0E0E0))
-
                 SettingItem(
-                    icon = Icons.Default.Feedback,
-                    title = "Phản hồi",
-                    subtitle = "Gửi phản hồi cho chúng tôi",
-                    onClick = { /* TODO: Feedback */ }
+                    icon = Icons.Default.BugReport,
+                    title = "Debug Tools",
+                    subtitle = "Công cụ debug cho developer",
+                    isDarkMode = isDarkMode,
+                    onClick = { navController.navigate("debug_followers") }
                 )
             }
 
@@ -294,12 +265,15 @@ fun SettingsScreen(navController: NavController) {
 @Composable
 fun UserProfileSection(
     userProfile: UserProfile?,
+    isDarkMode: Boolean,
     onEditClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDarkMode) Color(0xFF1E1E1E) else Color.White
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Row(
@@ -328,14 +302,14 @@ fun UserProfileSection(
                     text = userProfile?.username ?: "Unknown User",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1A1A1A)
+                    color = if (isDarkMode) Color.White else Color(0xFF1A1A1A)
                 )
 
                 if (!userProfile?.bio.isNullOrBlank()) {
                     Text(
                         text = userProfile?.bio ?: "",
                         fontSize = 14.sp,
-                        color = Color(0xFF666666),
+                        color = if (isDarkMode) Color(0xFFB0B0B0) else Color(0xFF666666),
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
@@ -343,7 +317,7 @@ fun UserProfileSection(
                 Text(
                     text = userProfile?.email ?: "",
                     fontSize = 12.sp,
-                    color = Color(0xFF999999),
+                    color = if (isDarkMode) Color(0xFF888888) else Color(0xFF999999),
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
@@ -363,6 +337,7 @@ fun UserProfileSection(
 @Composable
 fun SettingsSection(
     title: String,
+    isDarkMode: Boolean,
     content: @Composable () -> Unit
 ) {
     Column {
@@ -370,14 +345,16 @@ fun SettingsSection(
             text = title,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF1A1A1A),
+            color = if (isDarkMode) Color.White else Color(0xFF1A1A1A),
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
         )
 
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isDarkMode) Color(0xFF1E1E1E) else Color.White
+            ),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             content()
@@ -410,12 +387,12 @@ fun ThemeSettingItem(
                 text = if (isDarkMode) "Dark Mode" else "Light Mode",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF1A1A1A)
+                color = if (isDarkMode) Color.White else Color(0xFF1A1A1A)
             )
             Text(
                 text = if (isDarkMode) "Chế độ tối đang bật" else "Chế độ sáng đang bật",
                 fontSize = 14.sp,
-                color = Color(0xFF666666)
+                color = if (isDarkMode) Color(0xFFB0B0B0) else Color(0xFF666666)
             )
         }
 
@@ -435,6 +412,7 @@ fun SettingItem(
     icon: ImageVector,
     title: String,
     subtitle: String,
+    isDarkMode: Boolean,
     onClick: () -> Unit
 ) {
     Row(
@@ -458,19 +436,19 @@ fun SettingItem(
                 text = title,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF1A1A1A)
+                color = if (isDarkMode) Color.White else Color(0xFF1A1A1A)
             )
             Text(
                 text = subtitle,
                 fontSize = 14.sp,
-                color = Color(0xFF666666)
+                color = if (isDarkMode) Color(0xFFB0B0B0) else Color(0xFF666666)
             )
         }
 
         Icon(
             Icons.Default.ChevronRight,
             contentDescription = "Arrow",
-            tint = Color(0xFFCCCCCC),
+            tint = if (isDarkMode) Color(0xFF666666) else Color(0xFFCCCCCC),
             modifier = Modifier.size(20.dp)
         )
     }
