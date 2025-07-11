@@ -65,6 +65,60 @@ fun HomeScreen(navController: NavController) {
     val dividerColor = ThemeManager.getDividerColor()
     val accentColor = ThemeManager.getAccentColor()
 
+    // Function to refresh posts
+    fun refreshPosts() {
+        coroutineScope.launch {
+            isLoading = true
+            try {
+                val postsSnapshot = db.collection("posts")
+                    .orderBy("timestamp", Query.Direction.DESCENDING)
+                    .get()
+                    .await()
+
+                val postsWithProfiles = mutableListOf<Post>()
+
+                for (doc in postsSnapshot.documents) {
+                    val authorId = doc.getString("authorId") ?: ""
+                    var authorName = doc.getString("authorName") ?: "Unknown User"
+                    var authorAvatarUrl = doc.getString("authorAvatarUrl") ?: ""
+
+                    if (authorName == "Unknown User" && authorId.isNotEmpty()) {
+                        try {
+                            val authorProfile = UserRepository.getUserProfile(authorId)
+                            if (authorProfile != null) {
+                                authorName = authorProfile.username
+                                authorAvatarUrl = authorProfile.avatarUrl
+                            }
+                        } catch (e: Exception) {
+                            // Keep default values if profile load fails
+                        }
+                    }
+
+                    val post = Post(
+                        id = doc.id,
+                        authorId = authorId,
+                        author = authorName,
+                        authorAvatarUrl = authorAvatarUrl,
+                        time = formatTime(doc.getLong("timestamp") ?: 0L),
+                        content = doc.getString("content") ?: "",
+                        imageUrls = doc.get("imageUrls") as? List<String> ?: emptyList(),
+                        likes = doc.getLong("likes")?.toInt() ?: 0,
+                        likedBy = doc.get("likedBy") as? List<String> ?: emptyList(),
+                        comments = doc.getLong("comments")?.toInt() ?: 0,
+                        timestamp = doc.getLong("timestamp") ?: 0L
+                    )
+                    postsWithProfiles.add(post)
+                }
+                posts = postsWithProfiles
+                Toast.makeText(context, "Đã làm mới", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Lỗi khi tải bài viết: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
     // Load user profile
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
@@ -72,69 +126,15 @@ fun HomeScreen(navController: NavController) {
         }
     }
 
-    // Load posts with user profiles
+    // Initial post load
     LaunchedEffect(Unit) {
-        try {
-            val postsSnapshot = db.collection("posts")
-                .orderBy("timestamp", Query.Direction.DESCENDING)
-                .get()
-                .await()
-
-            val postsWithProfiles = mutableListOf<Post>()
-
-            for (doc in postsSnapshot.documents) {
-                val authorId = doc.getString("authorId") ?: ""
-                var authorName = doc.getString("authorName") ?: "Unknown User"
-                var authorAvatarUrl = doc.getString("authorAvatarUrl") ?: ""
-
-                // Load author profile from Firestore if authorName is Unknown User
-                if (authorName == "Unknown User" && authorId.isNotEmpty()) {
-                    try {
-                        val authorProfile = UserRepository.getUserProfile(authorId)
-                        if (authorProfile != null) {
-                            authorName = authorProfile.username
-                            authorAvatarUrl = authorProfile.avatarUrl
-                        }
-                    } catch (e: Exception) {
-                        // Keep default values if profile load fails
-                    }
-                }
-
-                val post = Post(
-                    id = doc.id,
-                    authorId = authorId,
-                    author = authorName,
-                    authorAvatarUrl = authorAvatarUrl,
-                    time = formatTime(doc.getLong("timestamp") ?: 0L),
-                    content = doc.getString("content") ?: "",
-                    imageUrls = doc.get("imageUrls") as? List<String> ?: emptyList(),
-                    likes = doc.getLong("likes")?.toInt() ?: 0,
-                    likedBy = doc.get("likedBy") as? List<String> ?: emptyList(),
-                    comments = doc.getLong("comments")?.toInt() ?: 0,
-                    timestamp = doc.getLong("timestamp") ?: 0L
-                )
-
-                postsWithProfiles.add(post)
-            }
-
-            posts = postsWithProfiles
-
-        } catch (e: Exception) {
-            Toast.makeText(context, "Lỗi khi tải bài viết: ${e.message}", Toast.LENGTH_SHORT).show()
-        } finally {
-            isLoading = false
-        }
+        refreshPosts()
     }
+
     fun deletePost(postId: String) {
         coroutineScope.launch {
             try {
-                // Delete the post document from Firestore
                 db.collection("posts").document(postId).delete().await()
-
-                // TODO: Delete images from Firebase Storage associated with the post
-                // TODO: Delete comments subcollection for the post
-
-                // Update the UI
                 posts = posts.filterNot { it.id == postId }
                 Toast.makeText(context, "Đã xóa bài viết", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
@@ -178,7 +178,6 @@ fun HomeScreen(navController: NavController) {
 
     Scaffold(
         topBar = {
-            // Top Bar với theme-aware colors
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shadowElevation = 4.dp,
@@ -190,7 +189,6 @@ fun HomeScreen(navController: NavController) {
                         .padding(horizontal = 20.dp, vertical = 16.dp)
                         .statusBarsPadding()
                 ) {
-                    // Logo và Tên logo
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
@@ -198,7 +196,9 @@ fun HomeScreen(navController: NavController) {
                         Image(
                             painter = painterResource(id = R.drawable.logothehub),
                             contentDescription = "App Logo",
-                            modifier = Modifier.size(50.dp)
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clickable { refreshPosts() }
                         )
 
                         Spacer(modifier = Modifier.width(12.dp))
@@ -208,12 +208,13 @@ fun HomeScreen(navController: NavController) {
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             color = textColor,
-                            modifier = Modifier.offset(y = 2.dp)
+                            modifier = Modifier
+                                .offset(y = 2.dp)
+                                .clickable { refreshPosts() }
                         )
 
                         Spacer(modifier = Modifier.weight(1f))
 
-                        // Avatar người dùng
                         Box(
                             modifier = Modifier
                                 .size(42.dp)
@@ -236,7 +237,6 @@ fun HomeScreen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Thanh tìm kiếm - FUNCTIONAL
                     TextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
@@ -282,7 +282,6 @@ fun HomeScreen(navController: NavController) {
             TheHubBottomBar(navController, current = "home")
         }
     ) { paddingValues ->
-        // Content area
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -324,7 +323,6 @@ fun HomeScreen(navController: NavController) {
     }
 }
 
-// Bottom Navigation Bar Component
 @Composable
 fun TheHubBottomBar(navController: NavController, current: String) {
     val accentColor = ThemeManager.getAccentColor()
@@ -342,7 +340,6 @@ fun TheHubBottomBar(navController: NavController, current: String) {
                 .navigationBarsPadding(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left-side items
             Row(
                 modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.SpaceAround
@@ -361,7 +358,6 @@ fun TheHubBottomBar(navController: NavController, current: String) {
                 )
             }
 
-            // Center "Add Post" button
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -378,7 +374,6 @@ fun TheHubBottomBar(navController: NavController, current: String) {
                 )
             }
 
-            // Right-side items
             Row(
                 modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.SpaceAround
@@ -457,7 +452,6 @@ fun PostItem(post: Post, navController: NavController, onLongPress: () -> Unit) 
     val currentUser = Firebase.auth.currentUser
     val db = Firebase.firestore
 
-    // Theme-aware colors
     val cardColor = ThemeManager.getCardColor()
     val textColor = ThemeManager.getTextColor()
     val secondaryTextColor = ThemeManager.getSecondaryTextColor()
@@ -483,7 +477,6 @@ fun PostItem(post: Post, navController: NavController, onLongPress: () -> Unit) 
                     )
                 ).await()
 
-                // Tạo notification nếu like (không phải unlike)
                 if (!isLiked && post.authorId != currentUser.uid) {
                     val currentUserProfile = UserRepository.getCurrentUserProfile()
                     if (currentUserProfile != null) {
@@ -521,7 +514,6 @@ fun PostItem(post: Post, navController: NavController, onLongPress: () -> Unit) 
         context.startActivity(android.content.Intent.createChooser(shareIntent, "Chia sẻ bài viết"))
     }
 
-    // Post Card
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -539,7 +531,6 @@ fun PostItem(post: Post, navController: NavController, onLongPress: () -> Unit) 
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Author info
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -585,7 +576,6 @@ fun PostItem(post: Post, navController: NavController, onLongPress: () -> Unit) 
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Content
             Text(
                 text = post.content,
                 fontSize = 14.sp,
@@ -593,7 +583,6 @@ fun PostItem(post: Post, navController: NavController, onLongPress: () -> Unit) 
                 color = textColor
             )
 
-            // Images
             if (post.imageUrls.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 LazyRow(
@@ -614,12 +603,10 @@ fun PostItem(post: Post, navController: NavController, onLongPress: () -> Unit) 
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Action buttons
             Row(
                 horizontalArrangement = Arrangement.spacedBy(32.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Like button
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { toggleLike() }
@@ -641,7 +628,6 @@ fun PostItem(post: Post, navController: NavController, onLongPress: () -> Unit) 
                     }
                 }
 
-                // Comment button
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { showComments = !showComments }
@@ -663,7 +649,6 @@ fun PostItem(post: Post, navController: NavController, onLongPress: () -> Unit) 
                     }
                 }
 
-                // Share button
                 Icon(
                     painter = painterResource(id = R.drawable.iconchiase),
                     contentDescription = "Share",
@@ -674,7 +659,6 @@ fun PostItem(post: Post, navController: NavController, onLongPress: () -> Unit) 
                 )
             }
 
-            // Comments section
             if (showComments) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Divider(color = dividerColor)
