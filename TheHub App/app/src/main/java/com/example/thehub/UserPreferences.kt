@@ -2,6 +2,7 @@ package com.example.thehub
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.thehub.chat.Message // SỬA: Import đúng lớp Message
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
@@ -18,7 +19,6 @@ object UserPreferences {
         return context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
     }
 
-    // Existing functions remain the same...
     fun saveLoginCredentials(context: Context, username: String, password: String, remember: Boolean) {
         val prefs = getPreferences(context)
         prefs.edit().apply {
@@ -70,11 +70,10 @@ object UserPreferences {
         }
     }
 
-    // New functions for search history
     fun saveSearchHistory(context: Context, searches: List<String>) {
         val prefs = getPreferences(context)
         val gson = Gson()
-        val json = gson.toJson(searches.take(10)) // Keep only last 10 searches
+        val json = gson.toJson(searches.take(10))
         prefs.edit().putString(KEY_SEARCH_HISTORY, json).apply()
     }
 
@@ -93,11 +92,10 @@ object UserPreferences {
         }
     }
 
-    // New functions for chat history
     fun saveChatHistory(context: Context, conversationId: String, messages: List<Message>) {
         val prefs = getPreferences(context)
         val gson = Gson()
-        val json = gson.toJson(messages.takeLast(100)) // Keep last 100 messages
+        val json = gson.toJson(messages.takeLast(100))
         prefs.edit().putString("$KEY_CHAT_HISTORY$conversationId", json).apply()
     }
 

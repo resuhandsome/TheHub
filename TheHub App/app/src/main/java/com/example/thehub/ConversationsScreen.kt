@@ -6,13 +6,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -27,7 +29,6 @@ import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-// Enhanced conversation data class
 data class ConversationItem(
     val id: String = "",
     val otherUserId: String = "",
@@ -44,10 +45,7 @@ fun ConversationsScreen(nav: NavController) {
     var conversations by remember { mutableStateOf<List<ConversationItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     val currentUser = Firebase.auth.currentUser
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
 
-    // Theme colors
     val backgroundColor = ThemeManager.getBackgroundColor()
     val surfaceColor = ThemeManager.getSurfaceColor()
     val textColor = ThemeManager.getTextColor()
@@ -72,7 +70,6 @@ fun ConversationsScreen(nav: NavController) {
 
                 if (otherUserId != null) {
                     val userDoc = db.collection("users").document(otherUserId).get().await()
-
                     conversationsList.add(
                         ConversationItem(
                             id = doc.id,
@@ -86,10 +83,9 @@ fun ConversationsScreen(nav: NavController) {
                     )
                 }
             }
-
             conversations = conversationsList
         } catch (e: Exception) {
-            // Handle error silently
+            // Handle error
         }
         isLoading = false
     }
@@ -109,6 +105,15 @@ fun ConversationsScreen(nav: NavController) {
                         fontWeight = FontWeight.Bold
                     )
                 },
+                navigationIcon = {
+                    IconButton(onClick = { nav.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = textColor
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = surfaceColor
                 )
@@ -126,22 +131,15 @@ fun ConversationsScreen(nav: NavController) {
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(
-                        color = ThemeManager.getAccentColor()
-                    )
+                    CircularProgressIndicator(color = ThemeManager.getAccentColor())
                 }
             } else if (conversations.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "💬",
-                            fontSize = 48.sp
-                        )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = "💬", fontSize = 48.sp)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "Chưa có cuộc trò chuyện nào",
@@ -156,19 +154,18 @@ fun ConversationsScreen(nav: NavController) {
                     }
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize()
-                ) {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(conversations) { conversation ->
-                        ConversationItem(
+                        ConversationItemView(
                             conversation = conversation,
                             onClick = {
                                 nav.navigate("chat/${conversation.id}")
                             }
                         )
-                        HorizontalDivider(
+                        Divider(
                             color = ThemeManager.getDividerColor(),
-                            thickness = 0.5.dp
+                            thickness = 0.5.dp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
                 }
@@ -178,11 +175,10 @@ fun ConversationsScreen(nav: NavController) {
 }
 
 @Composable
-private fun ConversationItem(
+private fun ConversationItemView(
     conversation: ConversationItem,
     onClick: () -> Unit
 ) {
-    val cardColor = ThemeManager.getCardColor()
     val textColor = ThemeManager.getTextColor()
     val secondaryTextColor = ThemeManager.getSecondaryTextColor()
 
@@ -224,8 +220,11 @@ private fun ConversationItem(
                 fontSize = 12.sp
             )
         },
+        colors = ListItemDefaults.colors(
+            containerColor = Color.Transparent
+        ),
         modifier = Modifier
             .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     )
 }

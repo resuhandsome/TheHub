@@ -35,7 +35,6 @@ class ChatViewModel(private val conversationId: String) : ViewModel() {
                 val db = Firebase.firestore
                 val currentUserId = Firebase.auth.currentUser!!.uid
 
-                // Load conversation to get other user info
                 val conversationDoc = db.collection("conversations")
                     .document(conversationId)
                     .get()
@@ -73,6 +72,14 @@ class ChatViewModel(private val conversationId: String) : ViewModel() {
             }
         }
     }
+
+    // (PHẦN THÊM MỚI) Hàm để gọi Repository xóa tin nhắn
+    fun deleteMessage(messageId: String) {
+        viewModelScope.launch {
+            repo.deleteMessage(messageId)
+        }
+    }
+
 
     override fun onCleared() {
         super.onCleared()

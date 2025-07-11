@@ -160,20 +160,6 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                     followDocs.documents.forEach { doc ->
                         db.collection("follows").document(doc.id).delete().await()
                     }
-
-                    followersCount = maxOf(0, followersCount - 1)
-
-                    db.collection("users").document(targetUserId)
-                        .update("followersCount", followersCount).await()
-
-                    if (currentUser.uid != targetUserId) {
-                        val currentUserDoc = db.collection("users").document(currentUser.uid).get().await()
-                        val currentFollowing = currentUserDoc.getLong("followingCount")?.toInt() ?: 0
-                        val newFollowing = maxOf(0, currentFollowing - 1)
-                        db.collection("users").document(currentUser.uid)
-                            .update("followingCount", newFollowing).await()
-                    }
-
                     isFollowing = false
                     Toast.makeText(context, "Đã hủy theo dõi", Toast.LENGTH_SHORT).show()
 
@@ -185,19 +171,6 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                     )
 
                     db.collection("follows").add(followData).await()
-
-                    followersCount += 1
-
-                    db.collection("users").document(targetUserId)
-                        .update("followersCount", followersCount).await()
-
-                    if (currentUser.uid != targetUserId) {
-                        val currentUserDoc = db.collection("users").document(currentUser.uid).get().await()
-                        val currentFollowing = currentUserDoc.getLong("followingCount")?.toInt() ?: 0
-                        val newFollowing = currentFollowing + 1
-                        db.collection("users").document(currentUser.uid)
-                            .update("followingCount", newFollowing).await()
-                    }
 
                     val currentUserProfile = UserRepository.getCurrentUserProfile()
                     if (currentUserProfile != null) {
@@ -219,6 +192,9 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                     Toast.makeText(context, "Đã theo dõi", Toast.LENGTH_SHORT).show()
                 }
 
+                // Recalculate counts for both users
+                UserRepository.recalculateFollowerCounts(currentUser.uid)
+                UserRepository.recalculateFollowerCounts(targetUserId)
                 loadProfileData()
 
             } catch (e: Exception) {
@@ -228,6 +204,43 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
             }
         }
     }
+
+    // (PHẦN THÊM MỚI) Logic để bắt đầu cuộc trò chuyện
+    fun startOrNavigateToChat() {
+        if (currentUser == null || userProfile == null) return
+
+        coroutineScope.launch {
+            try {
+                val targetUserId = userProfile!!.uid
+                val participantIds = listOf(currentUser.uid, targetUserId).sorted()
+
+                // 1. Tìm cuộc trò chuyện hiện có
+                val existingConvo = db.collection("conversations")
+                    .whereEqualTo("participants", participantIds)
+                    .limit(1)
+                    .get()
+                    .await()
+
+                if (existingConvo.isEmpty) {
+                    // 2. Nếu không có, tạo cuộc trò chuyện mới
+                    val newConvoData = hashMapOf(
+                        "participants" to participantIds,
+                        "lastMessage" to "Bắt đầu cuộc trò chuyện",
+                        "lastUpdate" to System.currentTimeMillis()
+                    )
+                    val newConvoRef = db.collection("conversations").add(newConvoData).await()
+                    navController.navigate("chat/${newConvoRef.id}")
+                } else {
+                    // 3. Nếu có, điều hướng đến nó
+                    val conversationId = existingConvo.documents.first().id
+                    navController.navigate("chat/${conversationId}")
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Không thể bắt đầu trò chuyện: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
 
     Scaffold(
         topBar = {
@@ -297,7 +310,9 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                         onFollowClick = { toggleFollow() },
                         onEditClick = {
                             navController.navigate("edit_profile")
-                        }
+                        },
+                        // (PHẦN THÊM MỚI)
+                        onMessageClick = { startOrNavigateToChat() }
                     )
                 }
 
@@ -351,7 +366,8 @@ fun ProfileHeader(
     isFollowing: Boolean,
     isFollowLoading: Boolean,
     onFollowClick: () -> Unit,
-    onEditClick: () -> Unit
+    onEditClick: () -> Unit,
+    onMessageClick: () -> Unit // (PHẦN THÊM MỚI)
 ) {
     val cardColor = ThemeManager.getCardColor()
     val textColor = ThemeManager.getTextColor()
@@ -439,7 +455,8 @@ fun ProfileHeader(
                         onClick = onFollowClick,
                         enabled = !isFollowLoading,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isFollowing) Color(0xFFE0E0E0) else accentColor
+                            containerColor = if (isFollowing) Color(0xFFE0E0E0) else accentColor,
+                            contentColor = if (isFollowing) secondaryTextColor else Color.White
                         ),
                         shape = RoundedCornerShape(24.dp),
                         modifier = Modifier
@@ -456,14 +473,13 @@ fun ProfileHeader(
                             Text(
                                 text = if (isFollowing) "Đang theo dõi" else "Theo dõi",
                                 fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (isFollowing) secondaryTextColor else Color.White
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
 
                     OutlinedButton(
-                        onClick = { /* TODO: Message */ },
+                        onClick = { onMessageClick() }, // (PHẦN SỬA ĐỔI)
                         shape = RoundedCornerShape(24.dp),
                         modifier = Modifier
                             .height(48.dp)
@@ -482,7 +498,7 @@ fun ProfileHeader(
         }
     }
 }
-
+//... (Các hàm composable còn lại không thay đổi)
 @Composable
 fun ProfileStats(
     postsCount: Int,

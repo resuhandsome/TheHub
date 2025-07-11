@@ -1,5 +1,6 @@
 package com.example.thehub
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -77,21 +78,25 @@ fun CommentSection(postId: String) {
                 )
             }
         } catch (e: Exception) {
-            // Handle error
         } finally {
             isLoading = false
         }
     }
 
     fun addComment() {
-        if (commentText.isBlank() || currentUser == null || currentUserProfile == null) return
+        val profile = currentUserProfile
+        // Sửa lỗi: Kiểm tra profile một cách an toàn hơn
+        if (commentText.isBlank() || currentUser == null || profile == null) {
+            Toast.makeText(context, "Không thể lấy thông tin người dùng, vui lòng thử lại", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         coroutineScope.launch {
             try {
                 val commentData = hashMapOf(
                     "authorId" to currentUser.uid,
-                    "authorName" to currentUserProfile!!.username,
-                    "authorAvatarUrl" to currentUserProfile!!.avatarUrl,
+                    "authorName" to profile.username,
+                    "authorAvatarUrl" to profile.avatarUrl,
                     "content" to commentText,
                     "timestamp" to System.currentTimeMillis()
                 )
@@ -112,13 +117,12 @@ fun CommentSection(postId: String) {
                 val postDoc = db.collection("posts").document(postId).get().await()
                 val postAuthorId = postDoc.getString("authorId")
 
-
                 if (postAuthorId != null && postAuthorId != currentUser.uid) {
                     val notificationData = hashMapOf(
                         "type" to "comment",
                         "fromUserId" to currentUser.uid,
-                        "fromUsername" to currentUserProfile!!.username,
-                        "fromUserAvatar" to currentUserProfile!!.avatarUrl,
+                        "fromUsername" to profile.username,
+                        "fromUserAvatar" to profile.avatarUrl,
                         "toUserId" to postAuthorId,
                         "message" to "đã bình luận bài viết của bạn",
                         "postId" to postId,
@@ -152,7 +156,7 @@ fun CommentSection(postId: String) {
                 }
 
             } catch (e: Exception) {
-                android.widget.Toast.makeText(context, "Lỗi khi thêm bình luận", android.widget.Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Lỗi khi thêm bình luận", Toast.LENGTH_SHORT).show()
                 println("DEBUG: Error adding comment - ${e.message}")
             }
         }

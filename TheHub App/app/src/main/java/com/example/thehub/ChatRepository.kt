@@ -1,5 +1,7 @@
 package com.example.thehub
 
+import android.util.Log
+import com.example.thehub.chat.Message
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -19,13 +21,18 @@ class ChatRepository(private val conversationId: String, private val myUid: Stri
 
     fun startListening() {
         listener = msgsRef.orderBy("timestamp", Query.Direction.ASCENDING)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w("ChatRepository", "Listen failed.", error)
+                    return@addSnapshotListener
+                }
+
                 val messageList = snapshot?.documents?.mapNotNull { doc ->
                     Message(
                         id = doc.id,
                         senderId = doc.getString("senderId") ?: "",
                         text = doc.getString("text") ?: "",
-                        timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                        timestamp = doc.getLong("timestamp") ?: 0L
                     )
                 } ?: emptyList()
                 _messages.value = messageList
@@ -43,10 +50,7 @@ class ChatRepository(private val conversationId: String, private val myUid: Stri
         )
 
         try {
-            // Add message to subcollection
             msgsRef.add(messageData).await()
-
-            // Update conversation metadata
             convoRef.update(
                 mapOf(
                     "lastMessage" to text,
@@ -54,7 +58,32 @@ class ChatRepository(private val conversationId: String, private val myUid: Stri
                 )
             ).await()
         } catch (e: Exception) {
-            // Handle error silently for now
+            Log.e("ChatRepository", "Error sending message", e)
+        }
+    }
+
+    // (PHẦN THÊM MỚI) Hàm để xóa tin nhắn
+    suspend fun deleteMessage(messageId: String) {
+        try {
+            msgsRef.document(messageId).delete().await()
+
+            // Cập nhật lastMessage nếu cần
+            val lastMessageSnapshot = msgsRef
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .limit(1)
+                .get()
+                .await()
+
+            val lastMessageText = if (lastMessageSnapshot.isEmpty) {
+                "Cuộc trò chuyện đã bắt đầu"
+            } else {
+                lastMessageSnapshot.documents.first().getString("text") ?: ""
+            }
+
+            convoRef.update("lastMessage", lastMessageText).await()
+
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "Error deleting message", e)
         }
     }
 
