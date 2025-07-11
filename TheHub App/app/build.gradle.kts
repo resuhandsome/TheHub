@@ -45,8 +45,8 @@ android {
 
 dependencies {
     // ===== BOM DEPENDENCIES =====
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
 
     // ===== CORE ANDROID =====
     implementation("androidx.core:core-ktx:1.12.0")
@@ -66,7 +66,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
 
     // ===== NAVIGATION =====
-    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.navigation:navigation-compose:2.8.0")
 
     // ===== FIREBASE =====
     implementation("com.google.firebase:firebase-analytics")
@@ -79,7 +79,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.0.0")
 
     // ===== NETWORK & IMAGE =====
-    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // ===== COROUTINES =====
@@ -88,6 +88,9 @@ dependencies {
 
     // ===== DATA STORAGE =====
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+    // ===== JSON PARSING =====
+    implementation("com.google.code.gson:gson:2.10.1")
 
     // ===== TESTING =====
     testImplementation(libs.junit)

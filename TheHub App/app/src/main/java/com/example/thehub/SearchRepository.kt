@@ -13,31 +13,62 @@ class SearchRepository {
     suspend fun search(q: String): List<SearchItem> = coroutineScope {
         if (q.isBlank()) return@coroutineScope emptyList()
 
+        val query = q.lowercase().trim()
+
         val users = async {
-            db.collection("users")
-                .whereGreaterThanOrEqualTo("username", q)
-                .whereLessThanOrEqualTo("username", q + '\uf8ff')
-                .get().await()
-                .map {
-                    SearchItem.User(
-                        it.id,
-                        it.getString("username") ?: "",
-                        it.getString("avatarUrl") ?: ""
-                    )
-                }
+            try {
+                // Search users by username (case insensitive)
+                db.collection("users")
+                    .orderBy("username")
+                    .startAt(query)
+                    .endAt(query + "\uf8ff")
+                    .limit(10)
+                    .get().await()
+                    .documents.mapNotNull { doc ->
+                        try {
+                            SearchItem.User(
+                                uid = doc.id,
+                                username = doc.getString("username") ?: "",
+                                avatar = doc.getString("avatarUrl") ?: ""
+                            )
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+            } catch (e: Exception) {
+                emptyList()
+            }
         }
+
         val posts = async {
-            db.collection("posts")
-                .whereGreaterThanOrEqualTo("content", q)
-                .whereLessThanOrEqualTo("content", q + '\uf8ff')
-                .orderBy("content")
-                .orderBy("timestamp", Query.Direction.DESCENDING)
-                .limit(20)
-                .get().await()
-                .map {
-                    SearchItem.Post(it.id, it.getString("content") ?: "")
-                }
+            try {
+                // Search posts by content
+                db.collection("posts")
+                    .orderBy("timestamp", Query.Direction.DESCENDING)
+                    .limit(20)
+                    .get().await()
+                    .documents.mapNotNull { doc ->
+                        try {
+                            val content = doc.getString("content") ?: ""
+                            if (content.lowercase().contains(query)) {
+                                SearchItem.Post(
+                                    id = doc.id,
+                                    snippet = content
+                                )
+                            } else null
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+            } catch (e: Exception) {
+                emptyList()
+            }
         }
-        users.await() + posts.await()
+
+        // Combine results with users first
+        val userResults = users.await()
+        val postResults = posts.await()
+
+        userResults + postResults
     }
 }

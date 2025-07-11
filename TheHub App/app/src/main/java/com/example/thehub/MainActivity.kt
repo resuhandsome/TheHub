@@ -55,5 +55,11 @@ fun AppNav() {
         }
         composable("edit_profile")    { EditProfileScreen(nav) }
         composable("favourites")      { FavouritesScreen(nav) }
+        composable("settings")        { SettingsScreen(nav) }
+//        composable("about")           { AboutScreen(nav) }
+//        composable("privacy")         { PrivacyScreen(nav) }
+//        composable("terms")           { TermsScreen(nav) }
+//        composable("help")            { HelpScreen(nav) }
+
     }
 }

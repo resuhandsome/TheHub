@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 
+
 object ThemeManager {
     private const val PREF_NAME = "theme_prefs"
     private const val KEY_DARK_MODE = "dark_mode"
