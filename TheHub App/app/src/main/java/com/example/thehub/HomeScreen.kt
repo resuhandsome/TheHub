@@ -110,7 +110,6 @@ fun HomeScreen(navController: NavController) {
                     postsWithProfiles.add(post)
                 }
                 posts = postsWithProfiles
-                Toast.makeText(context, "Đã làm mới", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Toast.makeText(context, "Lỗi khi tải bài viết: ${e.message}", Toast.LENGTH_SHORT).show()
             } finally {
