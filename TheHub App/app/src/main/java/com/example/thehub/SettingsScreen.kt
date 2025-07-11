@@ -1,5 +1,7 @@
 package com.example.thehub
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -205,7 +207,7 @@ fun SettingsScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Privacy & Security Section
+            // quyền riêng tư
             SettingsSection(
                 title = "Quyền riêng tư & Bảo mật",
                 isDarkMode = ThemeManager.isDarkMode
@@ -215,7 +217,10 @@ fun SettingsScreen(navController: NavController) {
                     title = "Quyền riêng tư",
                     subtitle = "Quản lý quyền riêng tư tài khoản",
                     isDarkMode = ThemeManager.isDarkMode,
-                    onClick = { /* TODO: Privacy settings */ }
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://policies.google.com/privacy"))
+                        context.startActivity(intent)
+                    }
                 )
 
                 Divider(color = if (ThemeManager.isDarkMode) Color.Gray.copy(alpha = 0.3f) else Color(0xFFE0E0E0))
@@ -231,7 +236,7 @@ fun SettingsScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Logout Button at Bottom
+            // đăng xuất
             Button(
                 onClick = { showLogoutDialog = true },
                 modifier = Modifier

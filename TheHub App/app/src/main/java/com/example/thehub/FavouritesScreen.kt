@@ -32,6 +32,9 @@ fun FavouritesScreen(navController: NavController) {
     var likedPosts by remember { mutableStateOf<List<Post>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf("") }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var postToDelete by remember { mutableStateOf<Post?>(null) }
+
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -45,6 +48,43 @@ fun FavouritesScreen(navController: NavController) {
     val secondaryTextColor = ThemeManager.getSecondaryTextColor()
     val iconColor = ThemeManager.getIconColor()
     val accentColor = ThemeManager.getAccentColor()
+
+    fun deletePost(postId: String) {
+        coroutineScope.launch {
+            try {
+                db.collection("posts").document(postId).delete().await()
+                likedPosts = likedPosts.filterNot { it.id == postId }
+                Toast.makeText(context, "Đã xóa bài viết", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Lỗi khi xóa bài viết: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    if (showDeleteDialog && postToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Xác nhận xóa") },
+            text = { Text("Bạn có chắc chắn muốn xóa bài viết này không?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deletePost(postToDelete!!.id)
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Xóa")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showDeleteDialog = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
 
     // Load liked posts
     LaunchedEffect(currentUser) {
@@ -252,7 +292,18 @@ fun FavouritesScreen(navController: NavController) {
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(likedPosts) { post ->
-                            PostItem(post = post, navController = navController)
+                            PostItem(
+                                post = post,
+                                navController = navController,
+                                onLongPress = {
+                                    if (post.authorId == currentUser?.uid) {
+                                        postToDelete = post
+                                        showDeleteDialog = true
+                                    } else {
+                                        Toast.makeText(context, "Bạn chỉ có thể xóa bài viết của mình", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            )
                         }
                     }
                 }

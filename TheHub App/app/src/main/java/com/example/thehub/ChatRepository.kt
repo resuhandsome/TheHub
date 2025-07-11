@@ -62,7 +62,7 @@ class ChatRepository(private val conversationId: String, private val myUid: Stri
         }
     }
 
-    // (PHẦN THÊM MỚI) Hàm để xóa tin nhắn
+    // xóa tin nhắn
     suspend fun deleteMessage(messageId: String) {
         try {
             msgsRef.document(messageId).delete().await()

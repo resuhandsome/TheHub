@@ -38,19 +38,24 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import androidx.compose.foundation.combinedClickable
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ProfileScreen(navController: NavController, userId: String? = null) {
     var userProfile by remember { mutableStateOf<UserProfile?>(null) }
     var userPosts by remember { mutableStateOf<List<Post>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isFollowing by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableStateOf("Posts") }
+    var selectedTab by remember { mutableStateOf("Bài viết") } // Thay đổi giá trị mặc định
     var isFollowLoading by remember { mutableStateOf(false) }
 
     var followersCount by remember { mutableStateOf(0) }
     var followingCount by remember { mutableStateOf(0) }
+
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var postToDelete by remember { mutableStateOf<Post?>(null) }
+
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -141,6 +146,42 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
         loadProfileData()
         isLoading = false
     }
+    fun deletePost(postId: String) {
+        coroutineScope.launch {
+            try {
+                db.collection("posts").document(postId).delete().await()
+                userPosts = userPosts.filterNot { it.id == postId }
+                Toast.makeText(context, "Đã xóa bài viết", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Lỗi khi xóa bài viết: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    if (showDeleteDialog && postToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Xác nhận xóa") },
+            text = { Text("Bạn có chắc chắn muốn xóa bài viết này không?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deletePost(postToDelete!!.id)
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Xóa")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showDeleteDialog = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
 
     fun toggleFollow() {
         if (currentUser == null || userProfile == null || isFollowLoading) return
@@ -339,17 +380,25 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
 
                 item {
                     when (selectedTab) {
-                        "Posts" -> {
+                        "Bài viết" -> {
                             if (userPosts.isEmpty()) {
                                 EmptyPostsSection(isOwnProfile = isOwnProfile)
                             } else {
-                                PostsGrid(posts = userPosts)
+                                PostsGrid(
+                                    posts = userPosts,
+                                    onLongPress = { post ->
+                                        if (isOwnProfile) {
+                                            postToDelete = post
+                                            showDeleteDialog = true
+                                        }
+                                    }
+                                )
                             }
                         }
-                        "Media" -> {
+                        "Ảnh" -> {
                             MediaGrid(posts = userPosts.filter { it.imageUrls.isNotEmpty() })
                         }
-                        "Tagged" -> {
+                        "Được gắn thẻ" -> {
                             TaggedSection()
                         }
                     }
@@ -479,7 +528,7 @@ fun ProfileHeader(
                     }
 
                     OutlinedButton(
-                        onClick = { onMessageClick() }, // (PHẦN SỬA ĐỔI)
+                        onClick = { onMessageClick() },
                         shape = RoundedCornerShape(24.dp),
                         modifier = Modifier
                             .height(48.dp)
@@ -498,7 +547,7 @@ fun ProfileHeader(
         }
     }
 }
-//... (Các hàm composable còn lại không thay đổi)
+
 @Composable
 fun ProfileStats(
     postsCount: Int,
@@ -587,7 +636,7 @@ fun ProfileTabs(
     selectedTab: String,
     onTabSelected: (String) -> Unit
 ) {
-    val tabs = listOf("Posts", "Media", "Tagged")
+    val tabs = listOf("Bài viết", "Ảnh", "Được gắn thẻ")
     val cardColor = ThemeManager.getCardColor()
     val textColor = ThemeManager.getTextColor()
     val secondaryTextColor = ThemeManager.getSecondaryTextColor()
@@ -633,7 +682,7 @@ fun ProfileTabs(
 }
 
 @Composable
-fun PostsGrid(posts: List<Post>) {
+fun PostsGrid(posts: List<Post>, onLongPress: (Post) -> Unit) {
     val cardColor = ThemeManager.getCardColor()
 
     Card(
@@ -652,20 +701,24 @@ fun PostsGrid(posts: List<Post>) {
             modifier = Modifier.height(400.dp)
         ) {
             items(posts) { post ->
-                PostGridItem(post = post)
+                PostGridItem(post = post, onLongPress = { onLongPress(post) })
             }
         }
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun PostGridItem(post: Post) {
+fun PostGridItem(post: Post, onLongPress: () -> Unit) {
     val secondaryTextColor = ThemeManager.getSecondaryTextColor()
 
     Card(
         modifier = Modifier
             .aspectRatio(1f)
-            .clickable { /* TODO: Open post detail */ },
+            .combinedClickable(
+                onClick = { /* TODO: Open post detail */ },
+                onLongClick = onLongPress
+            ),
         shape = RoundedCornerShape(8.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {

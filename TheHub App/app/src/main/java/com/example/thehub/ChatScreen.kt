@@ -117,7 +117,7 @@ private fun MessageBubble(message: Message, onDelete: () -> Unit) {
             tonalElevation = 1.dp,
             modifier = Modifier.combinedClickable(
                 onClick = {},
-                onLongClick = { if (isMyMessage) showMenu = true } // Chỉ hiện menu nếu là tin nhắn của mình
+                onLongClick = { if (isMyMessage) showMenu = true }
             )
         ) {
             Text(
@@ -126,8 +126,6 @@ private fun MessageBubble(message: Message, onDelete: () -> Unit) {
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
             )
         }
-
-        //  Menu ngữ cảnh để xóa
         DropdownMenu(
             expanded = showMenu,
             onDismissRequest = { showMenu = false }

@@ -1,6 +1,5 @@
 package com.example.thehub
 
-// Sealed class để định nghĩa các loại search result
 sealed class SearchItem {
     data class User(
         val uid: String = "",

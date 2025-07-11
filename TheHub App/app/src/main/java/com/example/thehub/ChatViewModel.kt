@@ -73,7 +73,7 @@ class ChatViewModel(private val conversationId: String) : ViewModel() {
         }
     }
 
-    // (PHẦN THÊM MỚI) Hàm để gọi Repository xóa tin nhắn
+    // Hàm để gọi Repository xóa tin nhắn
     fun deleteMessage(messageId: String) {
         viewModelScope.launch {
             repo.deleteMessage(messageId)

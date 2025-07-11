@@ -35,8 +35,9 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import androidx.compose.foundation.combinedClickable
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(navController: NavController) {
     val currentUser = Firebase.auth.currentUser
@@ -46,6 +47,9 @@ fun HomeScreen(navController: NavController) {
     var isLoading by remember { mutableStateOf(true) }
     var currentUserProfile by remember { mutableStateOf<UserProfile?>(null) }
     var searchQuery by remember { mutableStateOf("") }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var postToDelete by remember { mutableStateOf<Post?>(null) }
+
 
     val db = Firebase.firestore
     val context = LocalContext.current
@@ -121,6 +125,49 @@ fun HomeScreen(navController: NavController) {
             isLoading = false
         }
     }
+    fun deletePost(postId: String) {
+        coroutineScope.launch {
+            try {
+                // Delete the post document from Firestore
+                db.collection("posts").document(postId).delete().await()
+
+                // TODO: Delete images from Firebase Storage associated with the post
+                // TODO: Delete comments subcollection for the post
+
+                // Update the UI
+                posts = posts.filterNot { it.id == postId }
+                Toast.makeText(context, "Đã xóa bài viết", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Lỗi khi xóa bài viết: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+
+    if (showDeleteDialog && postToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Xác nhận xóa") },
+            text = { Text("Bạn có chắc chắn muốn xóa bài viết này không?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deletePost(postToDelete!!.id)
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Xóa")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showDeleteDialog = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
 
     // Handle search
     fun handleSearch() {
@@ -260,7 +307,16 @@ fun HomeScreen(navController: NavController) {
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     items(posts) { post ->
-                        PostItem(post = post, navController = navController)
+                        PostItem(
+                            post = post,
+                            navController = navController,
+                            onLongPress = {
+                                if (post.authorId == currentUser?.uid) {
+                                    postToDelete = post
+                                    showDeleteDialog = true
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -282,28 +338,30 @@ fun TheHubBottomBar(navController: NavController, current: String) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(vertical = 12.dp)
                 .navigationBarsPadding(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Home
-            BottomNavItem(
-                icon = Icons.Default.Home,
-                label = "Trang chủ",
-                isSelected = current == "home",
-                onClick = { navController.navigate("home") }
-            )
+            // Left-side items
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                BottomNavItem(
+                    icon = Icons.Default.Home,
+                    label = "Trang chủ",
+                    isSelected = current == "home",
+                    onClick = { navController.navigate("home") }
+                )
+                BottomNavItem(
+                    icon = Icons.Default.Message,
+                    label = "Tin nhắn",
+                    isSelected = current == "messages",
+                    onClick = { navController.navigate("messages") }
+                )
+            }
 
-            // Messages
-            BottomNavItem(
-                icon = Icons.Default.Message,
-                label = "Tin nhắn",
-                isSelected = current == "messages",
-                onClick = { navController.navigate("messages") }
-            )
-
-            // Add Post Button (Center)
+            // Center "Add Post" button
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -320,21 +378,24 @@ fun TheHubBottomBar(navController: NavController, current: String) {
                 )
             }
 
-            // Notifications
-            BottomNavItem(
-                icon = Icons.Default.Notifications,
-                label = "Thông báo",
-                isSelected = current == "notifications",
-                onClick = { navController.navigate("notifications") }
-            )
-
-            // Profile
-            BottomNavItem(
-                icon = Icons.Default.Person,
-                label = "Profile",
-                isSelected = current == "profile",
-                onClick = { navController.navigate("profile") }
-            )
+            // Right-side items
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                BottomNavItem(
+                    icon = Icons.Default.Notifications,
+                    label = "Thông báo",
+                    isSelected = current == "notifications",
+                    onClick = { navController.navigate("notifications") }
+                )
+                BottomNavItem(
+                    icon = Icons.Default.Person,
+                    label = "Trang cá nhân",
+                    isSelected = current == "profile",
+                    onClick = { navController.navigate("profile") }
+                )
+            }
         }
     }
 }
@@ -384,8 +445,9 @@ fun BottomNavItem(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun PostItem(post: Post, navController: NavController) {
+fun PostItem(post: Post, navController: NavController, onLongPress: () -> Unit) {
     var isLiked by remember { mutableStateOf(post.likedBy.contains(Firebase.auth.currentUser?.uid)) }
     var likeCount by remember { mutableStateOf(post.likes) }
     var showComments by remember { mutableStateOf(false) }
@@ -463,7 +525,11 @@ fun PostItem(post: Post, navController: NavController) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp)
+            .combinedClickable(
+                onClick = { /* Handle regular click if needed */ },
+                onLongClick = onLongPress
+            ),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
