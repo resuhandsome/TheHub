@@ -85,7 +85,7 @@ fun ConversationsScreen(nav: NavController) {
             }
             conversations = conversationsList
         } catch (e: Exception) {
-            // Handle error
+            // handle error
         }
         isLoading = false
     }

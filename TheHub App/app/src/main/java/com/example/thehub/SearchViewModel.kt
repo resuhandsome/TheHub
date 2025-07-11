@@ -34,7 +34,7 @@ class SearchViewModel : ViewModel() {
 
         // Debounce search
         searchJob = viewModelScope.launch {
-            delay(300) // Wait 300ms before searching
+            delay(300) // delay time searching
             search(q)
         }
     }

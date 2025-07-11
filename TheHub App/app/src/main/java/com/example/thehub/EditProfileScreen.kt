@@ -36,7 +36,6 @@ import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.ktx.storage
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,7 +55,7 @@ fun EditProfileScreen(navController: NavController) {
     val storage = Firebase.storage
     val scrollState = rememberScrollState()
 
-    // Theme-aware colors
+    // theme-aware colors
     val backgroundColor = ThemeManager.getBackgroundColor()
     val surfaceColor = ThemeManager.getSurfaceColor()
     val cardColor = ThemeManager.getCardColor()
@@ -70,7 +69,7 @@ fun EditProfileScreen(navController: NavController) {
         selectedImageUri = uri
     }
 
-    // Load current user profile
+    // load current user profile
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             try {
@@ -99,14 +98,14 @@ fun EditProfileScreen(navController: NavController) {
             try {
                 var avatarUrl = currentUserProfile?.avatarUrl ?: ""
 
-                // Upload new avatar if selected
+                // upload new avatar if selected
                 selectedImageUri?.let { uri ->
                     val imageRef = storage.reference.child("avatars/${currentUser?.uid}")
                     val uploadTask = imageRef.putFile(uri).await()
                     avatarUrl = uploadTask.storage.downloadUrl.await().toString()
                 }
 
-                // Update profile data
+                // update profile data
                 val updatedProfile = currentUserProfile?.copy(
                     username = username,
                     displayName = displayName.ifBlank { username },

@@ -93,7 +93,7 @@ fun FavouritesScreen(navController: NavController) {
                 isLoading = true
                 errorMessage = ""
 
-                // Lấy tất cả posts mà user đã like
+                // lấy tất cả posts mà user đã like
                 val postsSnapshot = db.collection("posts")
                     .whereArrayContains("likedBy", currentUser.uid)
                     .get()

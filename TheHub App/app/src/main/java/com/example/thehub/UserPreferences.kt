@@ -2,7 +2,7 @@ package com.example.thehub
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.thehub.chat.Message // SỬA: Import đúng lớp Message
+import com.example.thehub.chat.Message
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 

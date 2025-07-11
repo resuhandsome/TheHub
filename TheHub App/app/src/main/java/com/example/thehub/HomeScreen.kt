@@ -26,7 +26,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.ktx.auth
@@ -49,7 +48,6 @@ fun HomeScreen(navController: NavController) {
     var searchQuery by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var postToDelete by remember { mutableStateOf<Post?>(null) }
-
 
     val db = Firebase.firestore
     val context = LocalContext.current
@@ -90,7 +88,7 @@ fun HomeScreen(navController: NavController) {
                                 authorAvatarUrl = authorProfile.avatarUrl
                             }
                         } catch (e: Exception) {
-                            // Keep default values if profile load fails
+                            // keep default values if profile load fails
                         }
                     }
 
@@ -118,14 +116,14 @@ fun HomeScreen(navController: NavController) {
         }
     }
 
-    // Load user profile
+    // load user profile
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             currentUserProfile = UserRepository.getCurrentUserProfile()
         }
     }
 
-    // Initial post load
+    // initial post load
     LaunchedEffect(Unit) {
         refreshPosts()
     }
@@ -141,7 +139,6 @@ fun HomeScreen(navController: NavController) {
             }
         }
     }
-
 
     if (showDeleteDialog && postToDelete != null) {
         AlertDialog(
@@ -167,8 +164,7 @@ fun HomeScreen(navController: NavController) {
         )
     }
 
-
-    // Handle search
+    // handle search
     fun handleSearch() {
         if (searchQuery.isNotEmpty()) {
             navController.navigate("search")
@@ -221,15 +217,18 @@ fun HomeScreen(navController: NavController) {
                                 .clickable { navController.navigate("profile") }
                         ) {
                             AsyncImage(
-                                model = currentUserProfile?.avatarUrl?.takeIf { it.isNotEmpty() }
-                                    ?: currentUser?.photoUrl,
+                                model = if (currentUserProfile?.avatarUrl.isNullOrEmpty()) {
+                                    defaultAvatar
+                                } else {
+                                    currentUserProfile?.avatarUrl
+                                },
                                 contentDescription = "User Avatar",
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .clip(CircleShape)
                                     .background(iconColor.copy(alpha = 0.2f)),
                                 contentScale = ContentScale.Crop,
-                                placeholder = painterResource(id = defaultAvatar)
+                                error = painterResource(id = defaultAvatar)
                             )
                         }
                     }
@@ -543,13 +542,18 @@ fun PostItem(post: Post, navController: NavController, onLongPress: () -> Unit) 
                         }
                 ) {
                     AsyncImage(
-                        model = post.authorAvatarUrl,
+                        model = if (post.authorAvatarUrl.isNullOrEmpty()) {
+                            R.drawable.logomacdinh
+                        } else {
+                            post.authorAvatarUrl
+                        },
                         contentDescription = "Author Avatar",
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(CircleShape)
                             .background(iconColor.copy(alpha = 0.2f)),
-                        placeholder = painterResource(id = R.drawable.logomacdinh)
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(id = R.drawable.logomacdinh)
                     )
                 }
 

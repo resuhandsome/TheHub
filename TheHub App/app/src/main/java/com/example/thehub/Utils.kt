@@ -1,6 +1,6 @@
 package com.example.thehub
 
-// Helper function để format thời gian - dùng chung cho toàn app
+// Helper function để format thời gian
 fun formatTime(timestamp: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - timestamp

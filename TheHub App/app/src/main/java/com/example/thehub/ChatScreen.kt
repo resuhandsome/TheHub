@@ -64,7 +64,7 @@ fun ChatScreen(nav: NavController, conversationId: String) {
                     value = draft,
                     onValueChange = { viewModel.updateDraft(it) },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Nhập tin nhắn…") },
+                    placeholder = { Text("Nhập tin nhắn...") },
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),
                         unfocusedContainerColor = if (ThemeManager.isDarkMode) Color(0xFF2A2A2A) else Color(0xFFF5F5F5),

@@ -2,7 +2,6 @@ package com.example.thehub
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -64,7 +63,7 @@ fun NotificationsScreen(navController: NavController) {
     val accentColor = ThemeManager.getAccentColor()
     val dividerColor = ThemeManager.getDividerColor()
 
-    // Load notifications với error handling tốt hơn
+    // Load notifications với error handling
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             try {
@@ -107,7 +106,7 @@ fun NotificationsScreen(navController: NavController) {
                 errorMessage = "Lỗi khi tải thông báo: ${e.message}"
                 println("DEBUG: Error loading notifications - ${e.message}")
 
-                // Tạo mock notifications nếu không có dữ liệu để test UI
+                // Tạo mock notifications
                 if (notifications.isEmpty()) {
                     notifications = createMockNotifications(currentUser.uid)
                 }
@@ -503,7 +502,7 @@ fun getNotificationMessage(type: String): String {
     }
 }
 
-// Function để tạo mock notifications cho testing
+// Function tạo mock notifications cho testing
 fun createMockNotifications(currentUserId: String): List<NotificationItem> {
     return listOf(
         NotificationItem(

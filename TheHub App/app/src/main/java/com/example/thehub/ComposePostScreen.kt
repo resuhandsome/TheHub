@@ -56,7 +56,7 @@ fun ComposePostScreen(navController: NavController) {
     val storage = Firebase.storage
     val scrollState = rememberScrollState()
 
-    // Load user profile
+    // load user profile
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             currentUserProfile = UserRepository.getCurrentUserProfile()
@@ -80,7 +80,7 @@ fun ComposePostScreen(navController: NavController) {
             try {
                 val imageUrls = mutableListOf<String>()
 
-                // Upload images to Firebase Storage
+                // upload images to Firebase Storage
                 for (imageUri in selectedImages) {
                     val imageRef = storage.reference.child("posts/${UUID.randomUUID()}")
                     val uploadTask = imageRef.putFile(imageUri).await()
@@ -88,7 +88,7 @@ fun ComposePostScreen(navController: NavController) {
                     imageUrls.add(downloadUrl.toString())
                 }
 
-                // Create post data
+                // create post data
                 val postData = hashMapOf(
                     "authorId" to currentUser?.uid,
                     "authorName" to (currentUserProfile?.username ?: "Unknown User"),
@@ -101,13 +101,13 @@ fun ComposePostScreen(navController: NavController) {
                     "comments" to 0
                 )
 
-                // Save to Firestore
+                // save to Firestore
                 val documentRef = db.collection("posts").add(postData).await()
 
-                // Debug log
+                // debug log
                 println("DEBUG: Created post with ID: ${documentRef.id}")
 
-                // Update user's posts count
+                // update user's posts count
                 if (currentUser != null && currentUserProfile != null) {
                     try {
                         val currentPostsSnapshot = db.collection("posts")
@@ -135,7 +135,7 @@ fun ComposePostScreen(navController: NavController) {
         }
     }
 
-    // Main Container với gradient background
+    // main container với gradient background
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -165,7 +165,7 @@ fun ComposePostScreen(navController: NavController) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Cancel button
+                    // cancel button
                     TextButton(
                         onClick = { navController.popBackStack() },
                         enabled = !isPosting,
@@ -180,7 +180,7 @@ fun ComposePostScreen(navController: NavController) {
                         )
                     }
 
-                    // Title
+                    // title
                     Text(
                         text = "Tạo bài viết",
                         fontSize = 20.sp,
@@ -188,7 +188,7 @@ fun ComposePostScreen(navController: NavController) {
                         color = Color(0xFF1A1A1A)
                     )
 
-                    // Post button
+                    // post button
                     Button(
                         onClick = { uploadPost() },
                         enabled = !isPosting && (postContent.isNotBlank() || selectedImages.isNotEmpty()),
@@ -220,14 +220,14 @@ fun ComposePostScreen(navController: NavController) {
                 }
             }
 
-            // Main Content với scroll
+            // main content với scroll
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
                     .padding(20.dp)
             ) {
-                // User Profile Section
+                // user profile section
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -240,7 +240,7 @@ fun ComposePostScreen(navController: NavController) {
                             .fillMaxWidth()
                             .padding(20.dp)
                     ) {
-                        // Avatar
+                        // avatar
                         Box(
                             modifier = Modifier
                                 .size(52.dp)
@@ -262,9 +262,9 @@ fun ComposePostScreen(navController: NavController) {
 
                         Spacer(modifier = Modifier.width(16.dp))
 
-                        // User Info và Content
+                        // user info và content
                         Column(modifier = Modifier.weight(1f)) {
-                            // Username
+                            // username
                             Text(
                                 text = currentUserProfile?.username ?: "Đang tải...",
                                 fontWeight = FontWeight.Bold,
@@ -281,7 +281,7 @@ fun ComposePostScreen(navController: NavController) {
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Text Input Area
+                            // text input area
                             TextField(
                                 value = postContent,
                                 onValueChange = { postContent = it },
@@ -314,7 +314,7 @@ fun ComposePostScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Selected Images Preview
+                // selected images preview
                 if (selectedImages.isNotEmpty()) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -353,7 +353,7 @@ fun ComposePostScreen(navController: NavController) {
                                             contentScale = ContentScale.Crop
                                         )
 
-                                        // Remove button
+                                        // remove button
                                         Box(
                                             modifier = Modifier
                                                 .align(Alignment.TopEnd)
@@ -384,7 +384,7 @@ fun ComposePostScreen(navController: NavController) {
                     Spacer(modifier = Modifier.height(20.dp))
                 }
 
-                // Action Buttons Section
+                // action buttons section
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -403,7 +403,7 @@ fun ComposePostScreen(navController: NavController) {
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Add Photo Button
+                        // add photo button
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -467,7 +467,7 @@ fun ComposePostScreen(navController: NavController) {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Feeling/Activity Button (Placeholder)
+                        // Feeling/Activity Button
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -510,7 +510,7 @@ fun ComposePostScreen(navController: NavController) {
                     }
                 }
 
-                // Bottom spacing để tránh bị keyboard che
+                // bottom spacing để tránh bị keyboard che
                 Spacer(modifier = Modifier.height(100.dp))
             }
         }

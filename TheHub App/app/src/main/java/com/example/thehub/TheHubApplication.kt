@@ -9,10 +9,10 @@ class TheHubApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Initialize Firebase
+        // initialize Firebase
         FirebaseApp.initializeApp(this)
 
-        // Initialize App Check for debug builds
+        // initialize app check for debug builds
         val firebaseAppCheck = FirebaseAppCheck.getInstance()
         firebaseAppCheck.installAppCheckProviderFactory(
             DebugAppCheckProviderFactory.getInstance()

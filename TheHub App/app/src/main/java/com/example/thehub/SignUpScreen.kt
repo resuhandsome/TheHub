@@ -25,7 +25,6 @@ import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignUpScreen(navController: NavController) {
     var username by remember { mutableStateOf("") }
@@ -270,13 +269,26 @@ fun SignUpScreen(navController: NavController) {
         Spacer(modifier = Modifier.height(16.dp))
 
         // Login link
-        TextButton(
-            onClick = { navController.navigate("login") }
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "Đã có tài khoản? Đăng nhập",
-                color = accentColor
+                text = "Đã có tài khoản? ",
+                color = textColor,
+                fontSize = 14.sp
             )
+            TextButton(
+                onClick = { navController.navigate("login") },
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text(
+                    text = "Đăng nhập",
+                    color = accentColor,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }

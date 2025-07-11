@@ -17,7 +17,7 @@ class SearchRepository {
 
         val users = async {
             try {
-                // Search users by username (case insensitive)
+                // search users by username (case insensitive)
                 db.collection("users")
                     .orderBy("username")
                     .startAt(query)
@@ -42,7 +42,7 @@ class SearchRepository {
 
         val posts = async {
             try {
-                // Search posts by content
+                // search posts by content
                 db.collection("posts")
                     .orderBy("timestamp", Query.Direction.DESCENDING)
                     .limit(20)
@@ -65,7 +65,7 @@ class SearchRepository {
             }
         }
 
-        // Combine results with users first
+        // combine results with users first
         val userResults = users.await()
         val postResults = posts.await()
 

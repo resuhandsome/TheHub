@@ -48,7 +48,7 @@ object UserRepository {
     suspend fun getCurrentUserProfile(): UserProfile? {
         val currentUser = auth.currentUser
         return if (currentUser != null) {
-            // Retry mechanism
+            // retry mechanism
             var profile: UserProfile? = null
             var attempts = 0
 

@@ -71,7 +71,7 @@ fun SettingsScreen(navController: NavController) {
         }
     }
 
-    // Logout Confirmation Dialog
+    // logout Confirmation Dialog
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },

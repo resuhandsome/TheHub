@@ -67,7 +67,7 @@ class ChatRepository(private val conversationId: String, private val myUid: Stri
         try {
             msgsRef.document(messageId).delete().await()
 
-            // Cập nhật lastMessage nếu cần
+            // cập nhật lastMessage nếu cần
             val lastMessageSnapshot = msgsRef
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .limit(1)

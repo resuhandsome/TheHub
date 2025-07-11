@@ -50,14 +50,14 @@ fun CommentSection(postId: String) {
     val currentUser = Firebase.auth.currentUser
     val db = Firebase.firestore
 
-    // Load user profile
+    // load user profile
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             currentUserProfile = UserRepository.getCurrentUserProfile()
         }
     }
 
-    // Load comments
+    // load comments
     LaunchedEffect(postId) {
         try {
             val commentsSnapshot = db.collection("posts")
@@ -85,7 +85,7 @@ fun CommentSection(postId: String) {
 
     fun addComment() {
         val profile = currentUserProfile
-        // Sửa lỗi: Kiểm tra profile một cách an toàn hơn
+        //kiểm tra profile
         if (commentText.isBlank() || currentUser == null || profile == null) {
             Toast.makeText(context, "Không thể lấy thông tin người dùng, vui lòng thử lại", Toast.LENGTH_SHORT).show()
             return
@@ -107,7 +107,7 @@ fun CommentSection(postId: String) {
                     .add(commentData)
                     .await()
 
-                // Update comment count
+                // update comment count
                 db.collection("posts")
                     .document(postId)
                     .update("comments", comments.size + 1)
@@ -136,7 +136,7 @@ fun CommentSection(postId: String) {
 
                 commentText = ""
 
-                // Reload comments
+                // reload comments
                 val updatedSnapshot = db.collection("posts")
                     .document(postId)
                     .collection("comments")
@@ -170,7 +170,7 @@ fun CommentSection(postId: String) {
         if (isLoading) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
         } else {
-            // Comments list
+            // comments list
             LazyColumn(
                 modifier = Modifier.heightIn(max = 200.dp)
             ) {
@@ -181,7 +181,7 @@ fun CommentSection(postId: String) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Add comment input
+            // add comment input
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()

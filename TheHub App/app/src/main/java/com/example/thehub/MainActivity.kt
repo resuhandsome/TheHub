@@ -56,10 +56,10 @@ fun AppNav() {
         composable("edit_profile")    { EditProfileScreen(nav) }
         composable("favourites")      { FavouritesScreen(nav) }
         composable("settings")        { SettingsScreen(nav) }
-//        composable("about")           { AboutScreen(nav) }
-//        composable("privacy")         { PrivacyScreen(nav) }
-//        composable("terms")           { TermsScreen(nav) }
-//        composable("help")            { HelpScreen(nav) }
+//        composable("about")           { AboutScreen(nav) } tính năng đang phát triển
+//        composable("privacy")         { PrivacyScreen(nav) } tính năng đang phát triển
+//        composable("terms")           { TermsScreen(nav) } tính năng đang phát triển
+//        composable("help")            { HelpScreen(nav) } tính năng đang phát triển
 
     }
 }

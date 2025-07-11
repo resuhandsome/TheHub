@@ -47,7 +47,7 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
     var userPosts by remember { mutableStateOf<List<Post>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isFollowing by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableStateOf("Bài viết") } // Thay đổi giá trị mặc định
+    var selectedTab by remember { mutableStateOf("Bài viết") }
     var isFollowLoading by remember { mutableStateOf(false) }
 
     var followersCount by remember { mutableStateOf(0) }
@@ -55,7 +55,6 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var postToDelete by remember { mutableStateOf<Post?>(null) }
-
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -146,6 +145,7 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
         loadProfileData()
         isLoading = false
     }
+
     fun deletePost(postId: String) {
         coroutineScope.launch {
             try {
@@ -181,7 +181,6 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
             }
         )
     }
-
 
     fun toggleFollow() {
         if (currentUser == null || userProfile == null || isFollowLoading) return
@@ -246,7 +245,7 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
         }
     }
 
-    // (PHẦN THÊM MỚI) Logic để bắt đầu cuộc trò chuyện
+    // Logic để bắt đầu cuộc trò chuyện
     fun startOrNavigateToChat() {
         if (currentUser == null || userProfile == null) return
 
@@ -255,7 +254,7 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                 val targetUserId = userProfile!!.uid
                 val participantIds = listOf(currentUser.uid, targetUserId).sorted()
 
-                // 1. Tìm cuộc trò chuyện hiện có
+                //  Tìm cuộc trò chuyện hiện có
                 val existingConvo = db.collection("conversations")
                     .whereEqualTo("participants", participantIds)
                     .limit(1)
@@ -263,7 +262,7 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                     .await()
 
                 if (existingConvo.isEmpty) {
-                    // 2. Nếu không có, tạo cuộc trò chuyện mới
+                    // Nếu không có, tạo cuộc trò chuyện mới
                     val newConvoData = hashMapOf(
                         "participants" to participantIds,
                         "lastMessage" to "Bắt đầu cuộc trò chuyện",
@@ -272,7 +271,7 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                     val newConvoRef = db.collection("conversations").add(newConvoData).await()
                     navController.navigate("chat/${newConvoRef.id}")
                 } else {
-                    // 3. Nếu có, điều hướng đến nó
+                    // Nếu có thì điều hướng đến nó
                     val conversationId = existingConvo.documents.first().id
                     navController.navigate("chat/${conversationId}")
                 }
@@ -281,7 +280,6 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
             }
         }
     }
-
 
     Scaffold(
         topBar = {
@@ -352,7 +350,6 @@ fun ProfileScreen(navController: NavController, userId: String? = null) {
                         onEditClick = {
                             navController.navigate("edit_profile")
                         },
-                        // (PHẦN THÊM MỚI)
                         onMessageClick = { startOrNavigateToChat() }
                     )
                 }
@@ -416,7 +413,7 @@ fun ProfileHeader(
     isFollowLoading: Boolean,
     onFollowClick: () -> Unit,
     onEditClick: () -> Unit,
-    onMessageClick: () -> Unit // (PHẦN THÊM MỚI)
+    onMessageClick: () -> Unit
 ) {
     val cardColor = ThemeManager.getCardColor()
     val textColor = ThemeManager.getTextColor()
@@ -441,7 +438,11 @@ fun ProfileHeader(
                     .shadow(8.dp, CircleShape)
             ) {
                 AsyncImage(
-                    model = userProfile?.avatarUrl?.takeIf { it.isNotEmpty() },
+                    model = if (userProfile?.avatarUrl.isNullOrEmpty()) {
+                        R.drawable.logomacdinh
+                    } else {
+                        userProfile?.avatarUrl
+                    },
                     contentDescription = "Profile Avatar",
                     modifier = Modifier
                         .fillMaxSize()
@@ -449,7 +450,7 @@ fun ProfileHeader(
                         .background(Color.Gray.copy(alpha = 0.3f))
                         .border(4.dp, cardColor, CircleShape),
                     contentScale = ContentScale.Crop,
-                    placeholder = painterResource(id = R.drawable.logomacdinh)
+                    error = painterResource(id = R.drawable.logomacdinh)
                 )
             }
 

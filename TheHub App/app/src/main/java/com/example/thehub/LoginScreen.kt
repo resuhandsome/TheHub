@@ -17,7 +17,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -145,7 +144,7 @@ fun LoginScreen(navController: NavController) {
     fun handleRememberLoginChange(newValue: Boolean) {
         rememberLogin = newValue
         if (!newValue) {
-            // Tự động xóa credentials khi bỏ tick
+            // xóa credentials khi bỏ tick
             UserPreferences.clearSavedCredentials(context)
             Toast.makeText(context, "Đã xóa thông tin đã lưu", Toast.LENGTH_SHORT).show()
         }
